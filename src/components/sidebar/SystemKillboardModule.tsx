@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ExternalLink, RefreshCw } from 'lucide-react';
+import { ExternalLink, Link as LinkIcon, RefreshCw } from 'lucide-react';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import type { MapSystemNode } from '@/lib/map/loadMap';
@@ -86,8 +86,28 @@ export function SystemKillboardModule({ system }: { system: MapSystemNode | null
     <Card size="sm">
       <CardHeader>
         <CardTitle>Killboard</CardTitle>
-        {system ? (
-          <CardAction>
+        <CardAction className="flex items-center gap-1">
+          <Button
+            asChild
+            variant="ghost"
+            size="icon-sm"
+            aria-label={
+              systemId != null ? 'Open system on zKillboard' : 'Open zKillboard'
+            }
+          >
+            <a
+              href={
+                systemId != null
+                  ? `https://zkillboard.com/system/${systemId}/`
+                  : 'https://zkillboard.com/'
+              }
+              target="_blank"
+              rel="noreferrer"
+            >
+              <LinkIcon />
+            </a>
+          </Button>
+          {system ? (
             <Button
               variant="ghost"
               size="icon-sm"
@@ -97,8 +117,8 @@ export function SystemKillboardModule({ system }: { system: MapSystemNode | null
             >
               <RefreshCw className={status === 'loading' ? 'animate-spin' : undefined} />
             </Button>
-          </CardAction>
-        ) : null}
+          ) : null}
+        </CardAction>
       </CardHeader>
       <CardContent className="text-xs">
         {!system ? (
