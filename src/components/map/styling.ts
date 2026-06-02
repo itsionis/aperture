@@ -40,6 +40,15 @@ export function systemStatusColor(status: MapSystemNode['status']): string {
   return STATUS_COLORS[status];
 }
 
+// Reserved for the Home-system marker (accent ring + header icon). Kept distinct
+// from the status palette so it never reads as a system status.
+const HOME_ACCENT = '#fbbf24'; // amber/gold
+
+/** Accent colour for the designated Home system's ring and header icon. */
+export function homeAccentColor(): string {
+  return HOME_ACCENT;
+}
+
 const MASS_COLORS: Record<MapConnectionEdge['massStatus'], string> = {
   fresh: '#84cc16',
   reduced: '#f59e0b',

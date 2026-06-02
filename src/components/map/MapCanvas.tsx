@@ -138,7 +138,7 @@ export function MapCanvas({
       id: s.id,
       type: 'system' as const,
       position: { x: s.positionX, y: s.positionY },
-      data: s,
+      data: { ...s, isHome: s.id === data.map.homeMapSystemId },
       selected: false,
       draggable: !s.locked,
     })),
@@ -600,7 +600,7 @@ export function MapCanvas({
           id: s.id,
           type: 'system' as const,
           position,
-          data: { ...s, onAliasOrTagCommit },
+          data: { ...s, onAliasOrTagCommit, isHome: s.id === viewData.map.homeMapSystemId },
           selected: selectedSystemIds.has(s.id),
           draggable: !s.locked,
         };

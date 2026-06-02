@@ -2,9 +2,9 @@
 
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { PreviewCard } from '@base-ui/react/preview-card';
-import { Lock, Users } from 'lucide-react';
+import { Home, Lock, Users } from 'lucide-react';
 import type { MapSystemNode } from '@/lib/map/loadMap';
-import { systemClassColor, systemStatusColor } from './styling';
+import { homeAccentColor, systemClassColor, systemStatusColor } from './styling';
 import { InlineTextEdit } from './InlineTextEdit';
 import { usePresenceForSystem } from './MapPresenceContext';
 import { useUnderglowForSystem } from './MapUnderglowContext';
@@ -20,6 +20,8 @@ import { SystemUnderglow } from './SystemUnderglow';
 export type SystemNodeData = MapSystemNode & {
   /** Wired by `MapCanvas`; absent on the (now legacy) read-only path. */
   onAliasOrTagCommit?: (mapSystemId: string, field: 'alias' | 'tag', next: string | null) => void;
+  /** Derived in `MapCanvas` from the map's `homeMapSystemId`; marks this tile as the Home system. */
+  isHome?: boolean;
 };
 
 function securityLabel(node: MapSystemNode): string {
@@ -35,6 +37,17 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
   const pilots = usePresenceForSystem(data.systemId);
   const glow = useUnderglowForSystem(data.id);
 
+  // Compose the box-shadow from the Home accent ring (inner) and the selection
+  // halo, so a selected Home tile shows both. Empty → undefined so the Tailwind
+  // `ring-1` shows as the resting state.
+  const home = homeAccentColor();
+  const boxShadow = [
+    data.isHome ? `0 0 0 2px ${home}` : '',
+    selected ? `0 0 0 4px ${color}40, 0 0 16px 3px ${color}cc` : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
+
   return (
     <div
       className="relative min-w-36 cursor-pointer rounded-md bg-card text-xs text-card-foreground shadow-sm ring-1 transition-[box-shadow,outline,transform] duration-50"
@@ -46,9 +59,7 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
         // 8-digit-hex alpha to the status hex.
         outline: selected ? `2px solid ${color}` : 'none',
         outlineOffset: selected ? '3px' : undefined,
-        boxShadow: selected
-          ? `0 0 0 4px ${color}40, 0 0 16px 3px ${color}cc`
-          : undefined,
+        boxShadow: boxShadow || undefined,
         transform: selected ? 'scale(1.01)' : undefined,
       }}
       title={`${data.regionName} › ${data.constellationName}`}
@@ -97,6 +108,9 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
           <span className="flex-1 truncate font-medium">{data.alias ?? data.name}</span>
         )}
         {pilots.length > 0 && <PresenceBadge pilots={pilots} />}
+        {data.isHome && (
+          <Home className="size-3" style={{ color: home }} aria-label="Home system" />
+        )}
         {data.locked && <Lock className="size-3 text-muted-foreground" />}
       </div>
 
