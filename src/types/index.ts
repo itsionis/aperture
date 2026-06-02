@@ -7,6 +7,7 @@ import type {
   apEventKind,
   apMap,
   apMapConnection,
+  apMapConnectionLog,
   apMapEvent,
   apMapRoleAccess,
   apMapSignature,
@@ -98,6 +99,25 @@ export type NewApMapSystem = InferInsertModel<typeof apMapSystem>;
 
 export type ApMapConnection = InferSelectModel<typeof apMapConnection>;
 export type NewApMapConnection = InferInsertModel<typeof apMapConnection>;
+
+export type ApMapConnectionLog = InferSelectModel<typeof apMapConnectionLog>;
+export type NewApMapConnectionLog = InferInsertModel<typeof apMapConnectionLog>;
+
+/**
+ * Display row for the connection mass-log (Stage 17.11a). One per logged jump,
+ * joined to the acting character + ship type, with a running cumulative mass.
+ * `mass`/`cumulativeMass` cross the wire as `number` (kg fits in a JS safe int).
+ */
+export type ConnectionMassLogEntry = {
+  id: string;
+  characterId: string | null;
+  characterName: string | null;
+  shipTypeId: number | null;
+  shipTypeName: string | null;
+  mass: number;
+  cumulativeMass: number;
+  jumpedAt: string;
+};
 
 export type ApMapSignature = InferSelectModel<typeof apMapSignature>;
 export type NewApMapSignature = InferInsertModel<typeof apMapSignature>;

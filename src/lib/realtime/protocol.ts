@@ -45,6 +45,7 @@ export const SERVER_TO_CLIENT_TASKS = [
   'healthCheck',
   'logData',
   'systemNotification',
+  'connectionMassLog',
 ] as const;
 
 export const CLIENT_TO_SERVER_TASKS = ['subscribe', 'unsubscribe'] as const;
@@ -361,6 +362,32 @@ export const systemNotificationLoadSchema = z.object({
 
 export type SystemNotificationLoad = z.infer<typeof systemNotificationLoadSchema>;
 
+/**
+ * `connectionMassLog` envelope load (Stage 17.11a). A *transient*
+ * server-observed event: the location-poll logged a ship's jump across a
+ * wormhole connection. Like `characterUpdate` / `systemNotification` it carries
+ * no `MapViewData` state and is broadcast by a direct `pg_notify` that bypasses
+ * `ap_map_event` (see `src/lib/map/connectionMassLog.ts`). The bus discriminates
+ * on the top-level `task` field.
+ *
+ * `connectionId` / `logId` cross the wire as strings (stringified bigints);
+ * `mass` and `cumulativeMass` are kg as numbers (a hole's total stable mass is
+ * well within `Number.MAX_SAFE_INTEGER`). The open inspector refetches the log
+ * for the named connection on receipt.
+ */
+export const connectionMassLogLoadSchema = z.object({
+  mapId: z.number().int().positive(),
+  connectionId: z.string(),
+  logId: z.string(),
+  characterId: z.number().int().nullable(),
+  shipTypeId: z.number().int().nullable(),
+  mass: z.number(),
+  cumulativeMass: z.number(),
+  jumpedAt: z.string(),
+});
+
+export type ConnectionMassLogLoad = z.infer<typeof connectionMassLogLoadSchema>;
+
 export const logDataLoadSchema = z.object({
   mapId: z.number().int().positive(),
   // tightened in Stage 6/10: the ap_map_event history record.
@@ -385,6 +412,7 @@ export const serverToClientMessageSchema = z.discriminatedUnion('task', [
   message('healthCheck', healthCheckLoadSchema),
   message('logData', logDataLoadSchema),
   message('systemNotification', systemNotificationLoadSchema),
+  message('connectionMassLog', connectionMassLogLoadSchema),
 ]);
 
 export const clientToServerMessageSchema = z.discriminatedUnion('task', [

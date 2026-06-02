@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConnectionMassLog } from '@/components/sidebar/ConnectionMassLog';
 import type {
   MapConnectionEdge,
   MapSystemNode,
@@ -69,6 +70,8 @@ export function InspectorModule(props: {
   if (!connection) return <EmptyInspector />;
   return (
     <ConnectionInspector
+      key={connection.id}
+      mapId={viewData.map.id}
       connection={connection}
       onPatch={(patch) => props.onConnectionPatch(connection.id, patch)}
       onDelete={() => props.onConnectionDelete(connection.id)}
@@ -207,10 +210,12 @@ function SystemInspector({
 // ---------------------------------------------------------------------------
 
 function ConnectionInspector({
+  mapId,
   connection,
   onPatch,
   onDelete,
 }: {
+  mapId: string;
   connection: MapConnectionEdge;
   onPatch: (patch: UpdateConnectionBody) => void;
   onDelete: () => void;
@@ -301,6 +306,8 @@ function ConnectionInspector({
         </div>
 
         <ConnectionExpiryHint connection={connection} />
+
+        <ConnectionMassLog mapId={mapId} connection={connection} />
 
         <div className="flex justify-end">
           <Button type="button" variant="destructive" size="sm" onClick={onDelete} className="gap-1.5">

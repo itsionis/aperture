@@ -11,6 +11,7 @@ export * from './ap/character';
 export * from './ap/map';
 export * from './ap/map_system';
 export * from './ap/map_connection';
+export * from './ap/map_connection_log';
 export * from './ap/map_signature';
 export * from './ap/map_event';
 export * from './ap/event_kind';

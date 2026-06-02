@@ -30,3 +30,5 @@ Stage 17.8 adds `UnderglowConfig` (directly defined, not a re-export) — the co
 Stage 17.10 adds `TagScheme` (the `tag_scheme` pgEnum union: `none`/`abc`/`0121`) and the auto-tagging strategy contract from `src/lib/tagging/types.ts`: `ActiveScheme`, `TagSystem`, `TagEdge`, `TagContext`, `TagStrategy`, `AvailableTags`. `MapSettings` + `MapViewData.map` gain `tagScheme` + `homeMapSystemId`.
 
 Stage 17.9 adds the Thera module types from `src/lib/map/thera.ts`: `TheraHub` (`'Thera' | 'Turnur'`), `TheraConnection` (oriented + class-enriched EVE-Scout row), `TheraSyncInput`, and `TheraSyncResult` (`{ summary, payloads }`).
+
+Stage 17.11a adds `ApMapConnectionLog` / `NewApMapConnectionLog` (the `ap_map_connection_log` row) and the `ConnectionMassLogEntry` view type — a display row for the per-jump connection mass-log (joined character + ship-type name, `mass`/`cumulativeMass` as `number` kg). See `src/lib/map/connectionMassLog.ts`.

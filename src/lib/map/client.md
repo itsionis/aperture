@@ -37,6 +37,11 @@ POST. Await-then-apply.
 ### updateConnectionOnServer({ mapId, connectionId, patch }) / deleteConnectionOnServer({ mapId, connectionId })
 PATCH / DELETE on `/api/map/{mapId}/connections/{connectionId}`. Optimistic.
 
+### fetchConnectionMassLog({ mapId, connectionId }): Promise<FetchResult<ConnectionMassLogEntry[]>>
+GET `/api/map/{mapId}/connections/{connectionId}/mass-log` (view rights). Lists the connection's
+per-jump mass-log oldest-first with a running cumulative mass. Read-only — the log is server-derived
+(Stage 17.11a); the `ConnectionMassLog` inspector module refetches on the `connectionMassLog` realtime task.
+
 ### createSignatureOnServer({ mapId, body }) / updateSignatureOnServer({ mapId, signatureId, patch }) / deleteSignatureOnServer({ mapId, signatureId })
 POST / PATCH / DELETE on `/api/map/{mapId}/signatures[/{sigId}]`. Create awaits; update/delete are optimistic.
 

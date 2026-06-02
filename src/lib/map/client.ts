@@ -2,6 +2,7 @@ import type {
   ActionResult,
   BulkPasteOptions,
   BulkPasteResult,
+  ConnectionMassLogEntry,
   ImportResult,
   MapEventPayload,
   MapExportFile,
@@ -195,6 +196,20 @@ export function deleteConnectionOnServer(args: {
   return mutationFetch<MapEventPayload>(
     'DELETE',
     `/api/map/${args.mapId}/connections/${args.connectionId}`,
+  );
+}
+
+/**
+ * List a connection's per-jump mass-log (read; view rights). Returns a plain
+ * `FetchResult` — no `eventId`. The log is server-derived (Stage 17.11a); the
+ * inspector refetches on the `connectionMassLog` realtime task.
+ */
+export function fetchConnectionMassLog(args: {
+  mapId: string;
+  connectionId: string;
+}): Promise<FetchResult<ConnectionMassLogEntry[]>> {
+  return readFetch<ConnectionMassLogEntry[]>(
+    `/api/map/${args.mapId}/connections/${args.connectionId}/mass-log`,
   );
 }
 

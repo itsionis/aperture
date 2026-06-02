@@ -3,8 +3,10 @@ import { env } from '@/lib/env';
 import { apertureConfig } from '../../../aperture.config';
 import {
   characterUpdateLoadSchema,
+  connectionMassLogLoadSchema,
   systemNotificationLoadSchema,
   type CharacterUpdateLoad,
+  type ConnectionMassLogLoad,
   type MapEventPayload,
   type ServerToClientMessage,
   type SystemNotificationLoad,
@@ -161,10 +163,12 @@ class RealtimeBus {
 
     // Discriminator: the Stage 12.3 location-poll wraps its broadcasts as
     // `{ task: 'characterUpdate', load: {...} }`; the Stage 17.8 zKB feed wraps
-    // its as `{ task: 'systemNotification', load: {...} }`. `commitMapEvent`
-    // payloads have no top-level `task` field (the trigger forwards the raw
-    // event payload, which discriminates internally on `kind`). The bus routes
-    // by the presence of `task` and falls through to mapUpdate otherwise.
+    // its as `{ task: 'systemNotification', load: {...} }`; the Stage 17.11a
+    // mass-log wraps its as `{ task: 'connectionMassLog', load: {...} }`.
+    // `commitMapEvent` payloads have no top-level `task` field (the trigger
+    // forwards the raw event payload, which discriminates internally on `kind`).
+    // The bus routes by the presence of `task` and falls through to mapUpdate
+    // otherwise.
     const taskTag =
       data && typeof data === 'object' && typeof (data as { task?: unknown }).task === 'string'
         ? (data as { task: string }).task
@@ -179,6 +183,10 @@ class RealtimeBus {
       const parsed = systemNotificationLoadSchema.safeParse((data as { load?: unknown }).load);
       if (!parsed.success) return; // malformed envelope; drop silently
       message = { task: 'systemNotification', load: parsed.data as SystemNotificationLoad };
+    } else if (taskTag === 'connectionMassLog') {
+      const parsed = connectionMassLogLoadSchema.safeParse((data as { load?: unknown }).load);
+      if (!parsed.success) return; // malformed envelope; drop silently
+      message = { task: 'connectionMassLog', load: parsed.data as ConnectionMassLogLoad };
     } else {
       const kind =
         data && typeof data === 'object' && typeof (data as { kind?: unknown }).kind === 'string'

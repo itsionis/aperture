@@ -15,6 +15,8 @@ import {
   locationSchema,
 } from '@/lib/esi/decoders';
 import { classifyJump, type JumpClass } from '@/lib/map/locationToConnection';
+import { logConnectionJump } from '@/lib/map/connectionMassLog';
+import { shipMass } from '@/lib/eve/shipMass';
 import { foldWormholeJumpOntoMap } from '../locationCommit';
 import { withInstrumentation } from '../withInstrumentation';
 import type { JobModule } from '../registry';
@@ -186,6 +188,10 @@ async function poll(payload: LocationPollPayload, helpers: JobHelpers): Promise<
         toSystemId: location.solar_system_id,
       });
       if (jumpClass === 'wormhole') {
+        // Resolve the jumping ship's mass once (same ship across every tracked
+        // map) for the per-connection mass-log. Null when the type is unknown —
+        // `logConnectionJump` skips logging that jump.
+        const jumpMass = await shipMass(ship.ship_type_id);
         folds = [];
         for (const mapId of trackedMapIds) {
           const result = await foldWormholeJumpOntoMap({
@@ -193,6 +199,13 @@ async function poll(payload: LocationPollPayload, helpers: JobHelpers): Promise<
             characterId,
             fromSystemId: character.lastSystemId,
             toSystemId: location.solar_system_id,
+          });
+          await logConnectionJump({
+            mapId,
+            connectionId: result.connectionId,
+            characterId,
+            shipTypeId: ship.ship_type_id,
+            mass: jumpMass,
           });
           folds.push({
             mapId: mapId.toString(),

@@ -10,10 +10,10 @@ Runs three steps in sequence, each its own `commitMapEvent` transaction:
 
 1. **`ensureSystemVisible(from)`** — if a `(map_id, system_id)` row already exists with `visible = true`, skip (no event). Otherwise upsert visible=true and emit `system.added` carrying the full node body via `buildSystemNode`. A *fresh* insert gets a computed open slot (see Placement); a re-add of a hidden row keeps its prior position.
 2. **`ensureSystemVisible(to, { anchorSystemId: fromSystemId })`** — same as #1, but a fresh insert is anchored on the `from` system so the destination fans off the parent's real position instead of landing at (0,0).
-3. **`ensureConnection(fromMapSystemId, toMapSystemId)`** — if a connection already links the two endpoints in *either* direction, skip. Otherwise insert a new `scope='wh'`, `mass_status='fresh'`, `jump_mass_class=null` connection and emit `connection.create` with the full edge body.
+3. **`ensureConnection(fromMapSystemId, toMapSystemId)`** — if a connection already links the two endpoints in *either* direction, reuse it. Otherwise insert a new `scope='wh'`, `mass_status='fresh'`, `jump_mass_class=null` connection and emit `connection.create` with the full edge body. Returns `{ connectionId, created }` either way (the id feeds the mass-log; a self-loop throws — see Notes).
 4. **`tagOnJump`** (Stage 17.10 auto-tagging) — calls `assignTagOnConnect`; on a `0121` map the destination is rooted as a child of the `from` system and the assigned tag is emitted as a separate `system.updated` event. No-op for ABC (tagged at add, in `ensureSystemVisible` via `assignTagOnAdd`) and unscheme'd maps. Best-effort: a tagging failure is logged and never fails the jump fold.
 
-Returns `{ mapId, fromSystemAdded, toSystemAdded, connectionCreated }` — the booleans surface in `ap_job_run.notes` so the operability sweep can tell "the poll detected jumps and they were fully novel" from "the poll detected jumps but everything was already on the map".
+Returns `{ mapId, fromSystemAdded, toSystemAdded, connectionCreated, connectionId }`. The booleans surface in `ap_job_run.notes` so the operability sweep can tell "the poll detected jumps and they were fully novel" from "the poll detected jumps but everything was already on the map". `connectionId` (the traversed connection, created *or* pre-existing) is consumed by the caller (`locationPoll.ts`) to write the per-jump mass-log (`src/lib/map/connectionMassLog.ts`).
 
 ### Idempotency rules (Stage 12.2 decision)
 - **`system.added` suppressed** when the row is already visible. A re-add by a manual click in the UI between poll ticks is a separate event from the poll's perspective.
@@ -28,6 +28,6 @@ Returns `{ mapId, fromSystemAdded, toSystemAdded, connectionCreated }` — the b
 Each step is its own transaction. A failure between steps leaves a consistent state and the next poll tick (5s later on the online cadence) skips the parts that succeeded and retries the parts that didn't. There is no compensation logic.
 
 ### Notes
-- Self-loop guard (`sourceMapSystemId === targetMapSystemId`) in `ensureConnection` is defensive — the schema's `ap_map_connection_no_self_loop` CHECK would throw, but failing clean keeps the logs obvious.
+- Self-loop guard (`sourceMapSystemId === targetMapSystemId`) in `ensureConnection` throws with a clear message — the schema's `ap_map_connection_no_self_loop` CHECK would throw anyway, and `ensureConnection` must return a real `connectionId`, so a self-loop can't be silently skipped. Unreachable in practice: the poll only folds when `from != to` system, which yields distinct map-system rows.
 - Imports `commitMapEvent` from `src/lib/map/mutations/core.ts` (no `'server-only'` — see that file's `.md` for the precedent). Imports `buildSystemNode` from `src/lib/map/systemNode.ts` (extracted in 12.2 for the same reason).
 - This module is the only place in Stage 12 that writes to `ap_map_*` tables; the poll handler itself is observation-only and delegates here for fan-out.

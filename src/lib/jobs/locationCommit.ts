@@ -37,6 +37,8 @@ export interface FoldResult {
   fromSystemAdded: boolean;
   toSystemAdded: boolean;
   connectionCreated: boolean;
+  /** The connection the pilot traversed — created or pre-existing. Used by the mass-log. */
+  connectionId: bigint;
 }
 
 export async function foldWormholeJumpOntoMap(args: FoldArgs): Promise<FoldResult> {
@@ -46,7 +48,7 @@ export async function foldWormholeJumpOntoMap(args: FoldArgs): Promise<FoldResul
   const toOutcome = await ensureSystemVisible(args.mapId, args.toSystemId, args.characterId, {
     anchorSystemId: args.fromSystemId,
   });
-  const connectionCreated = await ensureConnection(
+  const connection = await ensureConnection(
     args.mapId,
     fromOutcome.mapSystemId,
     toOutcome.mapSystemId,
@@ -62,7 +64,8 @@ export async function foldWormholeJumpOntoMap(args: FoldArgs): Promise<FoldResul
     mapId: args.mapId,
     fromSystemAdded: fromOutcome.emitted,
     toSystemAdded: toOutcome.emitted,
-    connectionCreated,
+    connectionCreated: connection.created,
+    connectionId: connection.connectionId,
   };
 }
 
@@ -157,15 +160,24 @@ async function computePlacement(
   return findOpenPosition(anchor, occupied);
 }
 
+interface EnsureConnectionOutcome {
+  connectionId: bigint;
+  created: boolean;
+}
+
 async function ensureConnection(
   mapId: bigint,
   sourceMapSystemId: bigint,
   targetMapSystemId: bigint,
   characterId: bigint,
-): Promise<boolean> {
+): Promise<EnsureConnectionOutcome> {
   // Reject self-loop early — the underlying table CHECK constraint would
   // throw, but rejecting here keeps the failure mode obvious in the logs.
-  if (sourceMapSystemId === targetMapSystemId) return false;
+  if (sourceMapSystemId === targetMapSystemId) {
+    throw new Error(
+      `Refusing to fold a self-loop wormhole jump on map ${mapId} (system ${sourceMapSystemId}).`,
+    );
+  }
 
   const existing = await db
     .select({ id: apMapConnection.id })
@@ -186,8 +198,9 @@ async function ensureConnection(
       ),
     )
     .limit(1);
-  if (existing.length > 0) return false;
+  if (existing.length > 0) return { connectionId: existing[0]!.id, created: false };
 
+  let newConnectionId: bigint | null = null;
   const result = await commitMapEvent({
     mapId,
     characterId,
@@ -222,6 +235,7 @@ async function ensureConnection(
           eolAt: apMapConnection.eolAt,
           createdAt: apMapConnection.createdAt,
         });
+      newConnectionId = row!.id;
       return {
         id: row!.id.toString(),
         source: row!.source.toString(),
@@ -237,12 +251,12 @@ async function ensureConnection(
       };
     },
   });
-  if (!result.ok) {
+  if (!result.ok || newConnectionId === null) {
     throw new Error(
-      `Failed to create wormhole connection on map ${mapId}: ${result.error}`,
+      `Failed to create wormhole connection on map ${mapId}: ${result.ok ? 'no id returned' : result.error}`,
     );
   }
-  return true;
+  return { connectionId: newConnectionId, created: true };
 }
 
 /**

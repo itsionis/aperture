@@ -17,7 +17,7 @@
 ### Renders
 One of three sub-views:
 - **`SystemInspector`** — status select, alias / tag inputs (per-keystroke commit), intel notes textarea (committed on blur), locked checkbox, rally toggle button (label reads "Set rally" / "Clear rally" depending on current state), "Remove from map" button. Signatures are now a separate full-width panel below the map (see `SignatureModule`).
-- **`ConnectionInspector`** — scope / mass / jump-mass selects, EOL / Frigate / Preserve / Rolling checkboxes, a live "Expires in X" / "EOL expires in X" hint (`ConnectionExpiryHint`, derived from `connectionTimeLeftMs` + `formatRelativeFromMs`, hidden for non-wormhole scopes), "Delete connection" button.
+- **`ConnectionInspector`** — scope / mass / jump-mass selects, EOL / Frigate / Preserve / Rolling checkboxes, a live "Expires in X" / "EOL expires in X" hint (`ConnectionExpiryHint`, derived from `connectionTimeLeftMs` + `formatRelativeFromMs`, hidden for non-wormhole scopes), the read-only per-jump `ConnectionMassLog` (Stage 17.11a — server-derived cumulative mass), then the "Delete connection" button. Receives `mapId` (from `viewData.map.id`) to feed the mass-log fetch; remounted via `key={connection.id}`.
 - **`EmptyInspector`** — placeholder card prompting the user to select something.
 
 ### Behaviour & Interactions
@@ -29,6 +29,7 @@ One of three sub-views:
 ### Depends On
 - `Select*`, `Card*`, `Button`, `Input` shadcn primitives
 - `connectionTimeLeftMs` (`@/lib/map/connectionState`) + `formatRelativeFromMs` (`@/lib/map/relativeTime`) for the expiry hint
+- `ConnectionMassLog` (`@/components/sidebar/ConnectionMassLog`) for the per-jump mass-log block
 - Enum value lists from `@/lib/map/enumLabels`
 - `MapViewData`, `MapSystemNode`, `MapConnectionEdge` from `@/types`
 - Body types from `@/lib/map/client`
