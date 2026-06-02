@@ -1,6 +1,6 @@
 ## eolExpiry.ts
 
-**Purpose:** Cron task that hard-deletes wormhole connections whose end-of-life timer has elapsed (`is_eol AND eol_at < now() - WORMHOLE_EOL_LIFETIME_MS`) on maps that opt in via `ap_map.delete_eol_connections`. Stage 11.2.
+**Purpose:** Cron task that hard-deletes wormhole connections whose end-of-life timer has elapsed (`eol_stage <> 'none' AND eol_at < now() - <per-stage lifetime>`) on maps that opt in via `ap_map.delete_eol_connections`. Stage 11.2.
 **File:** `src/lib/jobs/tasks/eolExpiry.ts`
 
 ---
@@ -11,10 +11,10 @@
 - `run`: `withInstrumentation('eol-expiry', expireEol)`.
 
 ### expireEol(): { scanned, deleted, failed }
-Selects up to `JOB_DELETE_BATCH_SIZE` rows from `ap_map_connection` joined with `ap_map`, filtered by `is_eol = true`, `eol_at IS NOT NULL`, `eol_at < now() - 15300s` (`WORMHOLE_EOL_LIFETIME_MS / 1000` — same constant the canvas countdown reads, kept as ms per the project convention and converted to seconds at the SQL `make_interval` site), `ap_map.delete_eol_connections = true`, `ap_map.deleted_at IS NULL`. For each, fires `commitMapEvent({ kind: 'connection.delete', characterId: null })` — the trigger broadcasts the disappearance so client tabs drop the edge live. Attached `ap_map_signature` rows cascade-delete with the connection.
+Selects up to `JOB_DELETE_BATCH_SIZE` rows from `ap_map_connection` joined with `ap_map`, filtered by `eol_stage <> 'none'`, `eol_at IS NOT NULL`, `eol_at < now() - <per-stage lifetime>`, `ap_map.delete_eol_connections = true`, `ap_map.deleted_at IS NULL`. The per-stage lifetime is chosen in SQL with a `CASE`: `WORMHOLE_EOL_CRITICAL_LIFETIME_MS` (1h15m) for the `critical` stage, else `WORMHOLE_EOL_LIFETIME_MS` (4h15m) — the same constants the canvas countdown reads, kept as ms per the project convention and converted to seconds at the `make_interval` site. For each, fires `commitMapEvent({ kind: 'connection.delete', characterId: null })` — the trigger broadcasts the disappearance so client tabs drop the edge live. Attached `ap_map_signature` rows cascade-delete with the connection.
 
 Counts land in `ap_job_run.notes`.
 
 ### Notes
-- The `eol_at IS NOT NULL` guard skips the race where a writer sets `is_eol = true` but is mid-transaction on `eol_at`. The mutation core stamps both together (`connections.ts` `updateConnection`), so this is purely defensive.
+- The `eol_at IS NOT NULL` guard skips the race where a writer leaves the `none` stage but is mid-transaction on `eol_at`. The mutation core stamps both together (`connections.ts` `updateConnection`), so this is purely defensive.
 - Replaces legacy `Cron\MapUpdate::deleteEolConnections`. The legacy job's per-row erase wrote a `connection_log` row — the rebuild's equivalent is the `ap_map_event` insert from `commitMapEvent`.

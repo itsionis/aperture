@@ -61,14 +61,17 @@ export type EdgeStyle = {
 
 /**
  * Stroke styling for a connection. Scope picks the base colour; wormholes are
- * recoloured by mass status. EOL connections dash; frigate holes thin out.
+ * recoloured by mass status. EOL connections dash — the `critical` (1h) stage
+ * dashes more tightly than the `eol` (4h) stage to read as more urgent; frigate
+ * holes thin out.
  */
 export function connectionStyle(edge: MapConnectionEdge): EdgeStyle {
   const stroke = edge.scope === 'wh' ? MASS_COLORS[edge.massStatus] : SCOPE_COLORS[edge.scope];
   return {
     stroke,
     strokeWidth: edge.jumpMassClass === 's' ? 1.5 : 3,
-    strokeDasharray: edge.isEol ? '6 4' : undefined,
+    strokeDasharray:
+      edge.eolStage === 'critical' ? '2 3' : edge.eolStage === 'eol' ? '6 4' : undefined,
   };
 }
 
@@ -76,7 +79,8 @@ export function connectionStyle(edge: MapConnectionEdge): EdgeStyle {
 export function connectionBadges(edge: MapConnectionEdge): string[] {
   const badges: string[] = [];
   if (edge.jumpMassClass) badges.push(edge.jumpMassClass.toUpperCase());
-  if (edge.isEol) badges.push('EOL');
+  if (edge.eolStage === 'critical') badges.push('EOL 1h');
+  else if (edge.eolStage === 'eol') badges.push('EOL');
   if (edge.isRolling) badges.push('ROLL');
   if (edge.preserveMass) badges.push('PRES');
   return badges;

@@ -207,8 +207,16 @@ function ConnectionsPanel({
             <Td className="capitalize">{c.scope}</Td>
             <Td className="capitalize">{c.massStatus}</Td>
             <Td className="uppercase">{c.jumpMassClass ?? '—'}</Td>
-            <Td className={c.isEol ? 'text-destructive' : 'text-muted-foreground'}>
-              {c.isEol ? 'EOL' : '—'}
+            <Td
+              className={
+                c.eolStage === 'critical'
+                  ? 'font-medium text-destructive'
+                  : c.eolStage === 'eol'
+                    ? 'text-destructive'
+                    : 'text-muted-foreground'
+              }
+            >
+              {c.eolStage === 'critical' ? 'EOL 1h' : c.eolStage === 'eol' ? 'EOL' : '—'}
             </Td>
           </tr>
         ))}

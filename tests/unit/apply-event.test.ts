@@ -43,7 +43,7 @@ const conn1: MapConnectionEdge = {
   scope: 'wh',
   massStatus: 'fresh',
   jumpMassClass: null,
-  isEol: false,
+  eolStage: 'none',
   preserveMass: false,
   isRolling: false,
   eolAt: null,
@@ -174,12 +174,12 @@ describe('applyEvent — connection.update', () => {
       eventId: 11,
       id: '20',
       massStatus: 'critical',
-      isEol: true,
+      eolStage: 'critical',
       eolAt: '2026-01-01T00:00:00Z',
     });
     const c = next.connections[0]!;
     expect(c.massStatus).toBe('critical');
-    expect(c.isEol).toBe(true);
+    expect(c.eolStage).toBe('critical');
     expect(c.eolAt).toBe('2026-01-01T00:00:00Z');
   });
 

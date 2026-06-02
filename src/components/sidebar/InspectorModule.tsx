@@ -26,10 +26,13 @@ import type {
 } from '@/lib/map/client';
 import {
   CONNECTION_SCOPES,
+  EOL_STAGE_LABELS,
+  EOL_STAGES,
   SYSTEM_STATUSES,
   WH_JUMP_MASSES,
   WH_MASSES,
   type ConnectionScope,
+  type EolStage,
   type SystemStatus,
   type WhJumpMass,
   type WhMass,
@@ -291,8 +294,26 @@ function ConnectionInspector({
           </Select>
         </Row>
 
+        <Row label="EOL">
+          <Select<string>
+            value={connection.eolStage}
+            onValueChange={(v) => v && onPatch({ eolStage: v as EolStage })}
+            items={Object.fromEntries(EOL_STAGES.map((s) => [s, EOL_STAGE_LABELS[s]]))}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {EOL_STAGES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {EOL_STAGE_LABELS[s]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Row>
+
         <div className="grid grid-cols-2 gap-2">
-          <ConnFlag label="EOL" checked={connection.isEol} onChange={(v) => onPatch({ isEol: v })} />
           <ConnFlag
             label="Preserve mass"
             checked={connection.preserveMass}
@@ -328,7 +349,7 @@ function ConnectionExpiryHint({ connection }: { connection: MapConnectionEdge })
   }, []);
   const ms = connectionTimeLeftMs(connection, now);
   if (ms === null) return null;
-  const label = connection.isEol ? 'EOL expires in' : 'Expires in';
+  const label = connection.eolStage !== 'none' ? 'EOL expires in' : 'Expires in';
   return (
     <div className="flex items-center justify-between text-[10px] text-muted-foreground">
       <span>{label}</span>

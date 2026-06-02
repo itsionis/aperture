@@ -9,6 +9,7 @@ import {
   apMapSignature,
   apMapSystem,
   connectionScope,
+  eolStage,
   mapScope,
   mapType,
   signatureGroupKey,
@@ -32,6 +33,7 @@ import {
 
 type SystemStatus = (typeof systemStatus.enumValues)[number];
 type ConnectionScope = (typeof connectionScope.enumValues)[number];
+type EolStage = (typeof eolStage.enumValues)[number];
 type WhMass = (typeof whMass.enumValues)[number];
 type WhJumpMass = (typeof whJumpMass.enumValues)[number];
 type MapScope = (typeof mapScope.enumValues)[number];
@@ -71,10 +73,11 @@ export type MapConnectionEdge = {
   scope: ConnectionScope;
   massStatus: WhMass;
   jumpMassClass: WhJumpMass | null;
-  isEol: boolean;
+  /** EOL stage: `none` (not decaying), `eol` (~4h warning), `critical` (~1h final). */
+  eolStage: EolStage;
   preserveMass: boolean;
   isRolling: boolean;
-  /** When `is_eol` was first stamped (ISO). Null when the connection is not EOL. */
+  /** When the current `eol_stage` was entered (ISO). Null when `eolStage === 'none'`. */
   eolAt: string | null;
   /** ISO timestamp the row was inserted. Drives the pre-EOL "expires in X" hint. */
   createdAt: string;
@@ -257,7 +260,7 @@ export async function loadMapForView(
       scope: apMapConnection.scope,
       massStatus: apMapConnection.massStatus,
       jumpMassClass: apMapConnection.jumpMassClass,
-      isEol: apMapConnection.isEol,
+      eolStage: apMapConnection.eolStage,
       preserveMass: apMapConnection.preserveMass,
       isRolling: apMapConnection.isRolling,
       eolAt: apMapConnection.eolAt,
@@ -326,7 +329,7 @@ export async function loadMapForView(
       scope: c.scope,
       massStatus: c.massStatus,
       jumpMassClass: c.jumpMassClass,
-      isEol: c.isEol,
+      eolStage: c.eolStage,
       preserveMass: c.preserveMass,
       isRolling: c.isRolling,
       eolAt: c.eolAt ? c.eolAt.toISOString() : null,

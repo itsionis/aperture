@@ -88,7 +88,7 @@ async function main() {
 
   const connections = [
     conn(wormholes[0]!.id, wormholes[1]!.id, { massStatus: 'fresh' }),
-    conn(wormholes[0]!.id, wormholes[2]!.id, { massStatus: 'reduced', isEol: true }),
+    conn(wormholes[0]!.id, wormholes[2]!.id, { massStatus: 'reduced', eolStage: 'eol' }),
     wormholes[3]
       ? conn(wormholes[2]!.id, wormholes[3].id, {
           massStatus: 'critical',

@@ -204,16 +204,18 @@ function TravelDot({
 }
 
 // Ticks the EOL-flagged edge label once every 30s. Returns null when the
-// connection has no expiry (non-WH) or is not EOL — the pre-EOL "expires in"
-// hint only surfaces in the inspector to avoid cluttering every WH edge.
+// connection has no expiry (non-WH) or is not EOL (`eolStage === 'none'`) — the
+// pre-EOL "expires in" hint only surfaces in the inspector to avoid cluttering
+// every WH edge.
 function useEolCountdown(c: MapConnectionEdge): string | null {
+  const isEol = c.eolStage !== 'none';
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!c.isEol) return;
+    if (!isEol) return;
     const id = setInterval(() => setNow(Date.now()), EOL_COUNTDOWN_TICK_MS);
     return () => clearInterval(id);
-  }, [c.isEol]);
-  if (!c.isEol) return null;
+  }, [isEol]);
+  if (!isEol) return null;
   const ms = connectionTimeLeftMs(c, now);
   if (ms === null) return null;
   return formatRelativeFromMs(ms);

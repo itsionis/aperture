@@ -1,6 +1,6 @@
 import 'server-only';
 import { and, eq, type InferInsertModel } from 'drizzle-orm';
-import { apMapConnection, connectionScope, whJumpMass, whMass } from '@/db/schema';
+import { apMapConnection, connectionScope, eolStage, whJumpMass, whMass } from '@/db/schema';
 import { commitMapEvent, type ActionResult, type Tx } from './core';
 import type { MapEventPatch, MapEventPayload } from '@/lib/realtime/protocol';
 
@@ -13,6 +13,7 @@ import type { MapEventPatch, MapEventPayload } from '@/lib/realtime/protocol';
 type ConnectionScope = (typeof connectionScope.enumValues)[number];
 type WhMass = (typeof whMass.enumValues)[number];
 type WhJumpMass = (typeof whJumpMass.enumValues)[number];
+type EolStage = (typeof eolStage.enumValues)[number];
 
 export type CreateConnectionInput = {
   mapId: bigint;
@@ -22,7 +23,7 @@ export type CreateConnectionInput = {
   scope: ConnectionScope;
   massStatus?: WhMass;
   jumpMassClass?: WhJumpMass | null;
-  isEol?: boolean;
+  eolStage?: EolStage;
   preserveMass?: boolean;
   isRolling?: boolean;
 };
@@ -40,7 +41,7 @@ export type UpdateConnectionPatch = {
   scope?: ConnectionScope;
   massStatus?: WhMass;
   jumpMassClass?: WhJumpMass | null;
-  isEol?: boolean;
+  eolStage?: EolStage;
   preserveMass?: boolean;
   isRolling?: boolean;
 };
@@ -61,7 +62,7 @@ export function createConnection(
     characterId: input.characterId,
     kind: 'connection.create',
     mutate: async (tx) => {
-      const isEol = input.isEol ?? false;
+      const stage = input.eolStage ?? 'none';
       const [row] = await tx
         .insert(apMapConnection)
         .values({
@@ -71,10 +72,10 @@ export function createConnection(
           scope: input.scope,
           massStatus: input.massStatus ?? 'fresh',
           jumpMassClass: input.jumpMassClass ?? null,
-          isEol,
+          eolStage: stage,
           preserveMass: input.preserveMass ?? false,
           isRolling: input.isRolling ?? false,
-          eolAt: isEol ? new Date() : null,
+          eolAt: stage !== 'none' ? new Date() : null,
         })
         .returning({
           id: apMapConnection.id,
@@ -83,7 +84,7 @@ export function createConnection(
           scope: apMapConnection.scope,
           massStatus: apMapConnection.massStatus,
           jumpMassClass: apMapConnection.jumpMassClass,
-          isEol: apMapConnection.isEol,
+          eolStage: apMapConnection.eolStage,
           preserveMass: apMapConnection.preserveMass,
           isRolling: apMapConnection.isRolling,
           eolAt: apMapConnection.eolAt,
@@ -96,7 +97,7 @@ export function createConnection(
         scope: row!.scope,
         massStatus: row!.massStatus,
         jumpMassClass: row!.jumpMassClass,
-        isEol: row!.isEol,
+        eolStage: row!.eolStage,
         preserveMass: row!.preserveMass,
         isRolling: row!.isRolling,
         eolAt: row!.eolAt ? row!.eolAt.toISOString() : null,
@@ -129,10 +130,12 @@ export function deleteConnection(
 }
 
 /**
- * Update a connection's flags. Only keys present in `patch` change. Toggling
- * `isEol` true stamps `eol_at` to *now* the first time it goes EOL (preserving
- * the original timestamp on a repeat true), and clears it to null when set
- * false — this `eol_at` feeds the EOL-expiry cron. Emits `connection.update`.
+ * Update a connection's flags. Only keys present in `patch` change. Changing
+ * `eolStage` re-stamps `eol_at` to *now* whenever the stage actually changes to
+ * a non-`none` value (so the 1h `critical` window starts at the critical
+ * observation, not the original 4h flag), preserves the existing stamp on a
+ * repeat of the same stage, and clears it to null when set back to `none` —
+ * this `eol_at` feeds the EOL-expiry cron. Emits `connection.update`.
  */
 export function updateConnection(
   input: UpdateConnectionInput,
@@ -151,11 +154,14 @@ export function updateConnection(
       if ('isRolling' in patch) set.isRolling = patch.isRolling;
 
       let nextEolAt: Date | null | undefined;
-      if ('isEol' in patch) {
-        set.isEol = patch.isEol;
-        if (patch.isEol) {
+      if ('eolStage' in patch && patch.eolStage !== undefined) {
+        const nextStage = patch.eolStage;
+        set.eolStage = nextStage;
+        if (nextStage === 'none') {
+          nextEolAt = null;
+        } else {
           const [cur] = await tx
-            .select({ eolAt: apMapConnection.eolAt })
+            .select({ eolStage: apMapConnection.eolStage, eolAt: apMapConnection.eolAt })
             .from(apMapConnection)
             .where(
               and(
@@ -163,9 +169,9 @@ export function updateConnection(
                 eq(apMapConnection.mapId, input.mapId),
               ),
             );
-          nextEolAt = cur?.eolAt ?? new Date();
-        } else {
-          nextEolAt = null;
+          // Re-stamp when the stage changes (e.g. eol → critical restarts the 1h
+          // clock); keep the existing stamp when the same stage is re-applied.
+          nextEolAt = cur && cur.eolStage === nextStage ? (cur.eolAt ?? new Date()) : new Date();
         }
         set.eolAt = nextEolAt;
       }
@@ -185,8 +191,8 @@ export function updateConnection(
       if ('jumpMassClass' in patch) out.jumpMassClass = patch.jumpMassClass;
       if ('preserveMass' in patch) out.preserveMass = patch.preserveMass;
       if ('isRolling' in patch) out.isRolling = patch.isRolling;
-      if ('isEol' in patch) {
-        out.isEol = patch.isEol;
+      if ('eolStage' in patch && patch.eolStage !== undefined) {
+        out.eolStage = patch.eolStage;
         out.eolAt = nextEolAt ? nextEolAt.toISOString() : null;
       }
       return out;

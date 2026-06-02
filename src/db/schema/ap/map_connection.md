@@ -13,8 +13,9 @@
 - `scope` — `connection_scope` enum, required.
 - `mass_status` — `wh_mass` enum, default `fresh`.
 - `jump_mass_class` — `wh_jump_mass` enum, nullable (only WH links set it).
-- `is_eol`, `preserve_mass`, `is_rolling` — `boolean`, default `false`.
-- `eol_at` — `timestamptz`, nullable. Stamped when `is_eol` first goes true; read by the EOL-expiry cron.
+- `eol_stage` — `eol_stage` enum (`none`/`eol`/`critical`), default `none`. Replaces the legacy `is_eol` boolean (migration 0031); `eol` ≈ 4h warning, `critical` ≈ 1h final stage.
+- `preserve_mass`, `is_rolling` — `boolean`, default `false`.
+- `eol_at` — `timestamptz`, nullable. Stamped when the *current* `eol_stage` is entered (re-stamped on each stage change); read by the EOL-expiry cron + the countdown.
 - `created_at` / `updated_at` — `timestamptz`, default `now()`.
 
 **Check:** `source_map_system_id <> target_map_system_id` (`ap_map_connection_no_self_loop`).

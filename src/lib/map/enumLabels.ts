@@ -27,3 +27,13 @@ export type WhMass = (typeof WH_MASSES)[number];
 
 export const WH_JUMP_MASSES = ['s', 'm', 'l', 'xl'] as const;
 export type WhJumpMass = (typeof WH_JUMP_MASSES)[number];
+
+export const EOL_STAGES = ['none', 'eol', 'critical'] as const;
+export type EolStage = (typeof EOL_STAGES)[number];
+
+/** Human labels for the EOL-stage selector in the connection inspector. */
+export const EOL_STAGE_LABELS: Record<EolStage, string> = {
+  none: 'None',
+  eol: 'EOL (~4h)',
+  critical: 'Critical (~1h)',
+};

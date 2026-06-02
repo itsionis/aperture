@@ -5,7 +5,7 @@ import { getSession } from '@/lib/session';
 import { createConnection } from '@/lib/map/mutations/connections';
 import { updateSystem } from '@/lib/map/mutations/systems';
 import { assignTagOnConnect } from '@/lib/tagging/service';
-import { connectionScope, whJumpMass, whMass } from '@/db/schema/ap/enums';
+import { connectionScope, eolStage, whJumpMass, whMass } from '@/db/schema/ap/enums';
 import { parseBigInt, requireMapMutate } from '../../utils';
 
 /**
@@ -22,7 +22,7 @@ const createConnectionBodySchema = z.object({
   scope: z.enum(connectionScope.enumValues),
   massStatus: z.enum(whMass.enumValues).optional(),
   jumpMassClass: z.enum(whJumpMass.enumValues).nullable().optional(),
-  isEol: z.boolean().optional(),
+  eolStage: z.enum(eolStage.enumValues).optional(),
   preserveMass: z.boolean().optional(),
   isRolling: z.boolean().optional(),
 });
@@ -69,7 +69,7 @@ export async function POST(
     scope: parsed.data.scope,
     massStatus: parsed.data.massStatus,
     jumpMassClass: parsed.data.jumpMassClass,
-    isEol: parsed.data.isEol,
+    eolStage: parsed.data.eolStage,
     preserveMass: parsed.data.preserveMass,
     isRolling: parsed.data.isRolling,
   });

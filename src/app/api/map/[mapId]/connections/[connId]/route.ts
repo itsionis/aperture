@@ -3,7 +3,7 @@ import { type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/session';
 import { deleteConnection, updateConnection } from '@/lib/map/mutations/connections';
-import { connectionScope, whJumpMass, whMass } from '@/db/schema/ap/enums';
+import { connectionScope, eolStage, whJumpMass, whMass } from '@/db/schema/ap/enums';
 import { parseBigInt, requireMapMutate } from '../../../utils';
 
 /**
@@ -17,7 +17,7 @@ const updateConnectionBodySchema = z.object({
   scope: z.enum(connectionScope.enumValues).optional(),
   massStatus: z.enum(whMass.enumValues).optional(),
   jumpMassClass: z.enum(whJumpMass.enumValues).nullable().optional(),
-  isEol: z.boolean().optional(),
+  eolStage: z.enum(eolStage.enumValues).optional(),
   preserveMass: z.boolean().optional(),
   isRolling: z.boolean().optional(),
 });

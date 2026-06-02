@@ -6,7 +6,8 @@ import {
   type ConnectionLifecycleInput,
 } from '@/lib/map/connectionState';
 
-const { WORMHOLE_EOL_LIFETIME_MS, WORMHOLE_DEFAULT_LIFETIME_MS } = apertureConfig;
+const { WORMHOLE_EOL_LIFETIME_MS, WORMHOLE_EOL_CRITICAL_LIFETIME_MS, WORMHOLE_DEFAULT_LIFETIME_MS } =
+  apertureConfig;
 
 const CREATED = '2026-05-23T12:00:00.000Z';
 const CREATED_MS = new Date(CREATED).getTime();
@@ -15,7 +16,7 @@ const EOL_MS = new Date(EOL).getTime();
 
 const wh = (overrides: Partial<ConnectionLifecycleInput> = {}): ConnectionLifecycleInput => ({
   scope: 'wh',
-  isEol: false,
+  eolStage: 'none',
   eolAt: null,
   createdAt: CREATED,
   ...overrides,
@@ -28,21 +29,28 @@ describe('connectionExpiresAt', () => {
     expect(result!.getTime()).toBe(CREATED_MS + WORMHOLE_DEFAULT_LIFETIME_MS);
   });
 
-  it('returns eolAt + WORMHOLE_EOL_LIFETIME_MS once a wormhole is EOL', () => {
-    const result = connectionExpiresAt(wh({ isEol: true, eolAt: EOL }));
+  it('returns eolAt + WORMHOLE_EOL_LIFETIME_MS for the eol (4h) stage', () => {
+    const result = connectionExpiresAt(wh({ eolStage: 'eol', eolAt: EOL }));
     expect(result).not.toBeNull();
     expect(result!.getTime()).toBe(EOL_MS + WORMHOLE_EOL_LIFETIME_MS);
+  });
+
+  it('returns eolAt + WORMHOLE_EOL_CRITICAL_LIFETIME_MS for the critical (1h) stage', () => {
+    const result = connectionExpiresAt(wh({ eolStage: 'critical', eolAt: EOL }));
+    expect(result).not.toBeNull();
+    expect(result!.getTime()).toBe(EOL_MS + WORMHOLE_EOL_CRITICAL_LIFETIME_MS);
   });
 
   it('returns null for non-wormhole scopes (stargate / jumpbridge / abyssal never expire)', () => {
     for (const scope of ['stargate', 'jumpbridge', 'abyssal'] as const) {
       expect(connectionExpiresAt(wh({ scope }))).toBeNull();
-      expect(connectionExpiresAt(wh({ scope, isEol: true, eolAt: EOL }))).toBeNull();
+      expect(connectionExpiresAt(wh({ scope, eolStage: 'eol', eolAt: EOL }))).toBeNull();
     }
   });
 
-  it('returns null when isEol is true but eolAt is missing (stale snapshot defence)', () => {
-    expect(connectionExpiresAt(wh({ isEol: true, eolAt: null }))).toBeNull();
+  it('returns null when an EOL stage is set but eolAt is missing (stale snapshot defence)', () => {
+    expect(connectionExpiresAt(wh({ eolStage: 'eol', eolAt: null }))).toBeNull();
+    expect(connectionExpiresAt(wh({ eolStage: 'critical', eolAt: null }))).toBeNull();
   });
 });
 
@@ -61,8 +69,13 @@ describe('connectionTimeLeftMs', () => {
     expect(connectionTimeLeftMs(wh({ scope: 'stargate' }), CREATED_MS)).toBeNull();
   });
 
-  it('uses the EOL stamp once EOL is flagged', () => {
-    const remaining = connectionTimeLeftMs(wh({ isEol: true, eolAt: EOL }), EOL_MS + 1_000);
+  it('uses the EOL stamp + 4h lifetime once the eol stage is flagged', () => {
+    const remaining = connectionTimeLeftMs(wh({ eolStage: 'eol', eolAt: EOL }), EOL_MS + 1_000);
     expect(remaining).toBe(WORMHOLE_EOL_LIFETIME_MS - 1_000);
+  });
+
+  it('uses the 1h lifetime once the critical stage is flagged', () => {
+    const remaining = connectionTimeLeftMs(wh({ eolStage: 'critical', eolAt: EOL }), EOL_MS + 1_000);
+    expect(remaining).toBe(WORMHOLE_EOL_CRITICAL_LIFETIME_MS - 1_000);
   });
 });

@@ -211,6 +211,13 @@
       "when": 1779622800000,
       "tag": "0030_connection_mass_log",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1779624000000,
+      "tag": "0031_connection_eol_stage",
+      "breakpoints": true
     }
   ]
 }

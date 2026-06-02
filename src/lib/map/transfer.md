@@ -6,7 +6,7 @@
 ---
 
 ### MAP_EXPORT_VERSION
-`number` constant (`1`) stamped into every export and carried (unchecked beyond being a number) on import.
+`number` constant (`2`) stamped into every export and carried (unchecked beyond being a number) on import. v2 replaced the per-connection `isEol` boolean with the `eolStage` enum (`none`/`eol`/`critical`); `eol_at` is stamped to now on import when `eolStage !== 'none'`.
 
 ---
 

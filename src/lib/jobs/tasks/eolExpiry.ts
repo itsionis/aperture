@@ -1,4 +1,4 @@
-import { and, eq, isNull, lt, not, sql } from 'drizzle-orm';
+import { and, eq, isNull, not, sql } from 'drizzle-orm';
 import { apertureConfig } from '../../../../aperture.config';
 import { db } from '@/db/client';
 import { apMap, apMapConnection } from '@/db/schema';
@@ -8,15 +8,18 @@ import type { JobModule } from '../registry';
 
 /**
  * Stage 11.2. EOL-expiry cron: delete `ap_map_connection` rows that have been
- * flagged end-of-life (`is_eol = true`) for longer than
- * `WORMHOLE_EOL_LIFETIME_MS` (4h 15m, legacy `EXPIRE_CONNECTIONS_EOL`), but
+ * end-of-life (`eol_stage <> 'none'`) for longer than the lifetime of their
+ * *current* stage — `WORMHOLE_EOL_LIFETIME_MS` (4h 15m) for the `eol` stage,
+ * `WORMHOLE_EOL_CRITICAL_LIFETIME_MS` (1h 15m) for the `critical` stage — but
  * only on maps where `ap_map.delete_eol_connections = true`. Each delete fires
  * through `commitMapEvent` so it becomes a `connection.delete` event on the
  * realtime bus.
  *
- * Shares the Stage 10 ms constant with the canvas EOL countdown so the
- * "expires in X" hint and the actual reap threshold can never drift apart;
- * the SQL `make_interval(secs => …)` site converts ms → seconds.
+ * Shares the Stage 10 ms constants with the canvas EOL countdown so the
+ * "expires in X" hint and the actual reap threshold can never drift apart; the
+ * SQL `make_interval(secs => …)` site converts ms → seconds and picks the
+ * per-stage constant with a `CASE` so a hole escalated to `critical` is reaped
+ * on the 1h clock that started at its critical observation.
  *
  * Connections are hard-deleted (CLAUDE.md: wormholes don't come back); attached
  * `ap_map_signature` rows cascade.
@@ -37,13 +40,15 @@ async function expireEol(): Promise<{ scanned: number; deleted: number; failed: 
     .innerJoin(apMap, eq(apMapConnection.mapId, apMap.id))
     .where(
       and(
-        eq(apMapConnection.isEol, true),
-        // eol_at is null until isEol flips; skip races where isEol=true but no stamp yet.
+        not(eq(apMapConnection.eolStage, 'none')),
+        // eol_at is null until the stage leaves 'none'; skip races where the
+        // stage is set but no stamp landed yet.
         not(isNull(apMapConnection.eolAt)),
-        lt(
-          apMapConnection.eolAt,
-          sql`now() - make_interval(secs => ${apertureConfig.WORMHOLE_EOL_LIFETIME_MS / 1000})`,
-        ),
+        // The CASE branches are bound params (unknown → text), so the CASE result
+        // is text; cast it to double precision for make_interval's `secs` arg.
+        sql`${apMapConnection.eolAt} < now() - make_interval(secs => (case when ${apMapConnection.eolStage} = 'critical' then ${
+          apertureConfig.WORMHOLE_EOL_CRITICAL_LIFETIME_MS / 1000
+        } else ${apertureConfig.WORMHOLE_EOL_LIFETIME_MS / 1000} end)::double precision)`,
         eq(apMap.deleteEolConnections, true),
         isNull(apMap.deletedAt),
       ),

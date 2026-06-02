@@ -17,4 +17,4 @@ Counts land in `ap_job_run.notes`.
 
 ### Notes
 - 48h is the absolute maximum a wormhole can stay open in EVE; the cron is the safety net for wormholes that collapsed off-screen and never got marked.
-- Distinct from `eolExpiry`: that one is about the EOL *flag* timer (4h 15m after EOL flips true); this one is about absolute age regardless of flag state.
+- Distinct from `eolExpiry`: that one is about the EOL-stage timer (4h 15m after the `eol` stage / 1h 15m after the `critical` stage was entered); this one is about absolute age regardless of EOL stage.

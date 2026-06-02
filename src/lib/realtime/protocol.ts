@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   connectionScope,
+  eolStage,
   mapScope,
   mapType,
   signatureGroupKey,
@@ -111,6 +112,7 @@ const systemStatusEnum = z.enum(systemStatus.enumValues);
 const connectionScopeEnum = z.enum(connectionScope.enumValues);
 const whMassEnum = z.enum(whMass.enumValues);
 const whJumpMassEnum = z.enum(whJumpMass.enumValues);
+const eolStageEnum = z.enum(eolStage.enumValues);
 const mapScopeEnum = z.enum(mapScope.enumValues);
 const mapTypeEnum = z.enum(mapType.enumValues);
 const signatureGroupKeyEnum = z.enum(signatureGroupKey.enumValues);
@@ -145,7 +147,7 @@ const connectionEdgeBody = {
   scope: connectionScopeEnum,
   massStatus: whMassEnum,
   jumpMassClass: whJumpMassEnum.nullable(),
-  isEol: z.boolean(),
+  eolStage: eolStageEnum,
   preserveMass: z.boolean(),
   isRolling: z.boolean(),
   eolAt: z.string().nullable(),
@@ -192,7 +194,7 @@ export const mapEventPayloadSchema = z.discriminatedUnion('kind', [
     scope: connectionScopeEnum.optional(),
     massStatus: whMassEnum.optional(),
     jumpMassClass: whJumpMassEnum.nullable().optional(),
-    isEol: z.boolean().optional(),
+    eolStage: eolStageEnum.optional(),
     preserveMass: z.boolean().optional(),
     isRolling: z.boolean().optional(),
     eolAt: z.string().nullable().optional(),

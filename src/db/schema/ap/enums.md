@@ -29,6 +29,9 @@
 ### whJumpMass
 `pgEnum('wh_jump_mass', ['s', 'm', 'l', 'xl'])` — per-jump mass class (max ship size) of a wormhole. Nullable on `ap_map_connection` (non-WH links leave it null).
 
+### eolStage
+`pgEnum('eol_stage', ['none', 'eol', 'critical'])` — end-of-life stage of a wormhole connection. Replaces the legacy `is_eol` boolean (migration 0031) to support EVE's two decay warnings: `eol` (~4h, "reaching the end of its natural lifetime") and `critical` (~1h, the newer final stage); `none` is a hole not yet decaying. On `ap_map_connection`, default `none`. The stage selects which lifetime constant (`WORMHOLE_EOL_LIFETIME_MS` vs `WORMHOLE_EOL_CRITICAL_LIFETIME_MS`) drives the countdown + EOL-expiry reap. `eol_at` is re-stamped on each stage change.
+
 ### apWebhookChannel
 `pgEnum('ap_webhook_channel', ['discord'])` — outbound chat channel for an `ap_map_webhook` row. Stage 14 ships Discord only; adding `'slack'` later is a one-line `ALTER TYPE` migration plus a sibling client module.
 

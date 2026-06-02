@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { bigint, bigserial, boolean, check, pgTable, timestamp } from 'drizzle-orm/pg-core';
-import { connectionScope, whJumpMass, whMass } from './enums';
+import { connectionScope, eolStage, whJumpMass, whMass } from './enums';
 import { apMap } from './map';
 import { apMapSystem } from './map_system';
 
@@ -24,10 +24,13 @@ export const apMapConnection = pgTable(
     massStatus: whMass('mass_status').notNull().default('fresh'),
     // Nullable: only wormhole links carry a jump-mass class.
     jumpMassClass: whJumpMass('jump_mass_class'),
-    isEol: boolean('is_eol').notNull().default(false),
+    // Two-stage EOL: `eol` (~4h warning) and `critical` (~1h final). `none` =
+    // not yet decaying. Selects the lifetime the countdown / reap use.
+    eolStage: eolStage('eol_stage').notNull().default('none'),
     preserveMass: boolean('preserve_mass').notNull().default(false),
     isRolling: boolean('is_rolling').notNull().default(false),
-    // When `is_eol` was first set true — used by the EOL-expiry cron.
+    // When the *current* `eol_stage` was entered (re-stamped on each stage
+    // change) — used by the EOL-expiry cron and the countdown.
     eolAt: timestamp('eol_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

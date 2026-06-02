@@ -145,7 +145,7 @@ describe('read-only map view (real Postgres)', () => {
     expect(k2.alias).toBe('Hub2');
     expect(k2.tag).toBe('X');
     expect(data!.connections).toHaveLength(1);
-    expect(data!.connections[0]).toMatchObject({ scope: 'wh', massStatus: 'fresh', isEol: false });
+    expect(data!.connections[0]).toMatchObject({ scope: 'wh', massStatus: 'fresh', eolStage: 'none' });
   });
 
   it('returns null for a soft-deleted map', async () => {

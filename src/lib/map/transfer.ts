@@ -8,6 +8,7 @@ import {
   apMapSignature,
   apMapSystem,
   connectionScope,
+  eolStage,
   mapScope,
   mapType,
   signatureGroupKey,
@@ -39,13 +40,15 @@ import type { MapEventPayload } from '@/lib/realtime/protocol';
  *
  * The export carries no row ids that survive import beyond in-file referencing,
  * and no timestamps: `expires_at` is recomputed from the default TTL on import,
- * `eol_at` from `is_eol`, and `created_at` defaults. Re-importing the same file
+ * `eol_at` from `eol_stage` (stamped now when non-`none`), and `created_at`
+ * defaults. Re-importing the same file
  * is idempotent for systems (upsert on `(map_id, system_id)`) but APPENDS
  * connections (they have no natural unique key) — matching the legacy
  * "schema versioning not explicit" looseness.
  */
 
-export const MAP_EXPORT_VERSION = 1;
+// v2: connection `isEol` boolean replaced by the `eolStage` enum (0031).
+export const MAP_EXPORT_VERSION = 2;
 
 const systemStatusEnum = z.enum(systemStatus.enumValues);
 const connectionScopeEnum = z.enum(connectionScope.enumValues);
@@ -75,7 +78,7 @@ const exportConnectionSchema = z.object({
   scope: connectionScopeEnum,
   massStatus: whMassEnum,
   jumpMassClass: whJumpMassEnum.nullable(),
-  isEol: z.boolean(),
+  eolStage: z.enum(eolStage.enumValues),
   preserveMass: z.boolean(),
   isRolling: z.boolean(),
 });
@@ -168,7 +171,7 @@ export async function buildMapExport(mapId: bigint): Promise<MapExportFile> {
       scope: apMapConnection.scope,
       massStatus: apMapConnection.massStatus,
       jumpMassClass: apMapConnection.jumpMassClass,
-      isEol: apMapConnection.isEol,
+      eolStage: apMapConnection.eolStage,
       preserveMass: apMapConnection.preserveMass,
       isRolling: apMapConnection.isRolling,
     })
@@ -214,7 +217,7 @@ export async function buildMapExport(mapId: bigint): Promise<MapExportFile> {
       scope: c.scope,
       massStatus: c.massStatus,
       jumpMassClass: c.jumpMassClass,
-      isEol: c.isEol,
+      eolStage: c.eolStage,
       preserveMass: c.preserveMass,
       isRolling: c.isRolling,
     })),
@@ -322,10 +325,10 @@ export async function importMapData(args: {
                 scope: conn.scope,
                 massStatus: conn.massStatus,
                 jumpMassClass: conn.jumpMassClass,
-                isEol: conn.isEol,
+                eolStage: conn.eolStage,
                 preserveMass: conn.preserveMass,
                 isRolling: conn.isRolling,
-                eolAt: conn.isEol ? new Date() : null,
+                eolAt: conn.eolStage !== 'none' ? new Date() : null,
               })
               .returning({
                 id: apMapConnection.id,
@@ -334,7 +337,7 @@ export async function importMapData(args: {
                 scope: apMapConnection.scope,
                 massStatus: apMapConnection.massStatus,
                 jumpMassClass: apMapConnection.jumpMassClass,
-                isEol: apMapConnection.isEol,
+                eolStage: apMapConnection.eolStage,
                 preserveMass: apMapConnection.preserveMass,
                 isRolling: apMapConnection.isRolling,
                 eolAt: apMapConnection.eolAt,
@@ -348,7 +351,7 @@ export async function importMapData(args: {
               scope: row!.scope,
               massStatus: row!.massStatus,
               jumpMassClass: row!.jumpMassClass,
-              isEol: row!.isEol,
+              eolStage: row!.eolStage,
               preserveMass: row!.preserveMass,
               isRolling: row!.isRolling,
               eolAt: row!.eolAt ? row!.eolAt.toISOString() : null,

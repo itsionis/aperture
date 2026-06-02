@@ -6,12 +6,12 @@
 ---
 
 ### createConnection(input: CreateConnectionInput): Promise<ActionResult<MapEventPayload>>
-Inserts one `ap_map_connection` row between two map systems. Flag defaults: `massStatus = 'fresh'`, `jumpMassClass = null`, all booleans `false`; `eol_at` is stamped only when `isEol` is created true. Emits `connection.create` with the full edge body (id/source/target/scope/massStatus/jumpMassClass + flags).
+Inserts one `ap_map_connection` row between two map systems. Flag defaults: `massStatus = 'fresh'`, `jumpMassClass = null`, `eolStage = 'none'`, booleans `false`; `eol_at` is stamped only when the connection is created at a non-`none` `eolStage`. Emits `connection.create` with the full edge body (id/source/target/scope/massStatus/jumpMassClass/eolStage + flags).
 
 **Parameters:**
 - `input.sourceMapSystemId` / `input.targetMapSystemId` — endpoint `ap_map_system.id`s.
 - `input.scope` — required `connection_scope` (wh|stargate|jumpbridge|abyssal).
-- `input.massStatus`, `input.jumpMassClass`, `input.isEol`, `input.preserveMass`, `input.isRolling` — optional flag overrides.
+- `input.massStatus`, `input.jumpMassClass`, `input.eolStage`, `input.preserveMass`, `input.isRolling` — optional flag overrides.
 - `input.mapId`, `input.characterId` — map + audit FK.
 
 ---
@@ -22,10 +22,10 @@ Hard-deletes the `ap_map_connection` row matching `(connectionId, mapId)`; attac
 ---
 
 ### updateConnection(input: UpdateConnectionInput): Promise<ActionResult<MapEventPayload>>
-Updates connection flags; only keys present in `input.patch` change (presence via `in`, so `null`/`false` are honored). Toggling `isEol` true stamps `eol_at = now()` the first time it goes EOL and preserves the original timestamp on a repeat true; setting it false clears `eol_at` to null. `eol_at` crosses the wire as an ISO string (or null) in the payload. Emits `connection.update` → `{ id, ...changed }`.
+Updates connection flags; only keys present in `input.patch` change (presence via `in`, so `null`/`false` are honored). Changing `eolStage` re-stamps `eol_at = now()` whenever the stage actually changes to a non-`none` value (so `eol → critical` restarts the 1h clock at the critical observation), preserves the existing stamp on a repeat of the same stage, and clears `eol_at` to null when set back to `none`. `eol_at` crosses the wire as an ISO string (or null) in the payload. Emits `connection.update` → `{ id, ...changed }`.
 
 **Parameters:**
-- `input.patch` — `UpdateConnectionPatch`: `scope`, `massStatus`, `jumpMassClass`, `isEol`, `preserveMass`, `isRolling` (all optional).
+- `input.patch` — `UpdateConnectionPatch`: `scope`, `massStatus`, `jumpMassClass`, `eolStage`, `preserveMass`, `isRolling` (all optional).
 
 ---
 

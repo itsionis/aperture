@@ -183,7 +183,7 @@ describe.skipIf(!run)('system & connection mutations (real Postgres)', () => {
       target: targetId.toString(),
       scope: 'wh',
       massStatus: 'fresh',
-      isEol: false,
+      eolStage: 'none',
     });
     const connId = BigInt((created.data as { id: string }).id);
 
@@ -192,18 +192,22 @@ describe.skipIf(!run)('system & connection mutations (real Postgres)', () => {
       mapId,
       connectionId: connId,
       characterId: null,
-      patch: { isEol: true, massStatus: 'critical' },
+      patch: { eolStage: 'critical', massStatus: 'critical' },
     });
     expect(updated.ok).toBe(true);
     if (!updated.ok) return;
-    expect(updated.data).toMatchObject({ kind: 'connection.update', isEol: true, massStatus: 'critical' });
+    expect(updated.data).toMatchObject({
+      kind: 'connection.update',
+      eolStage: 'critical',
+      massStatus: 'critical',
+    });
     expect((updated.data as { eolAt: string }).eolAt).toBeTruthy();
     expect(await eventCount()).toBe(eolBefore + 1);
     const [conn] = await db
-      .select({ isEol: apMapConnection.isEol, eolAt: apMapConnection.eolAt })
+      .select({ eolStage: apMapConnection.eolStage, eolAt: apMapConnection.eolAt })
       .from(apMapConnection)
       .where(eq(apMapConnection.id, connId));
-    expect(conn!.isEol).toBe(true);
+    expect(conn!.eolStage).toBe('critical');
     expect(conn!.eolAt).toBeInstanceOf(Date);
 
     const deleted = await deleteConnection({ mapId, connectionId: connId, characterId: null });

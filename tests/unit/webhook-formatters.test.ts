@@ -133,7 +133,7 @@ describe('formatHistoryMessage', () => {
       scope: 'wh',
       massStatus: 'fresh',
       jumpMassClass: 'l',
-      isEol: false,
+      eolStage: 'none',
       preserveMass: false,
       isRolling: false,
       eolAt: null,
@@ -144,15 +144,27 @@ describe('formatHistoryMessage', () => {
     );
   });
 
-  it('renders connection.update EOL flip', () => {
+  it('renders connection.update EOL (4h) flip', () => {
     const event: MapEventPayload = {
       kind: 'connection.update',
       eventId: 7,
       id: '7',
-      isEol: true,
+      eolStage: 'eol',
     };
     expect(formatHistoryMessage(event, baseCtx)?.content).toBe(
-      '**Test Map** — Pilot Foo marked **Jita** ↔ **Amarr** as EOL.',
+      '**Test Map** — Pilot Foo marked **Jita** ↔ **Amarr** as EOL (~4h).',
+    );
+  });
+
+  it('renders connection.update critical EOL (1h) flip', () => {
+    const event: MapEventPayload = {
+      kind: 'connection.update',
+      eventId: 7,
+      id: '7',
+      eolStage: 'critical',
+    };
+    expect(formatHistoryMessage(event, baseCtx)?.content).toBe(
+      '**Test Map** — Pilot Foo marked **Jita** ↔ **Amarr** as critical EOL (~1h).',
     );
   });
 

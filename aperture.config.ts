@@ -196,6 +196,15 @@ export const apertureConfig = {
   WORMHOLE_EOL_LIFETIME_MS: 15_300_000,
 
   /**
+   * How long a wormhole connection has left from the moment it enters the
+   * *critical* (1h) EOL stage to the point the reap job purges it. Mirrors
+   * `WORMHOLE_EOL_LIFETIME_MS`'s 15-minute safety buffer beyond the in-game
+   * nominal: 1h + 15m = 4_500_000 ms. The newer of EVE's two EOL warnings
+   * ("~1h left") selects this constant over the 4h `WORMHOLE_EOL_LIFETIME_MS`.
+   */
+  WORMHOLE_EOL_CRITICAL_LIFETIME_MS: 4_500_000,
+
+  /**
    * Default lifetime of a (non-EOL) wormhole connection from creation. Legacy
    * `EXPIRE_CONNECTIONS_WH = 172800s` (48h). Used for the canvas "expires in X"
    * hint when the connection has not yet been flagged EOL, and by Stage 11's

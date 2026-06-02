@@ -259,11 +259,11 @@ describe.skipIf(!run)('Stage 12.2 location-poll jump classification + fan-out (r
       .select({
         scope: apMapConnection.scope,
         massStatus: apMapConnection.massStatus,
-        isEol: apMapConnection.isEol,
+        eolStage: apMapConnection.eolStage,
       })
       .from(apMapConnection)
       .where(eq(apMapConnection.mapId, mapA));
-    expect(conn).toMatchObject({ scope: 'wh', massStatus: 'fresh', isEol: false });
+    expect(conn).toMatchObject({ scope: 'wh', massStatus: 'fresh', eolStage: 'none' });
 
     const notes = await lastJobNotes();
     expect(notes!.jumpClass).toBe('wormhole');

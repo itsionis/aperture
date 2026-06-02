@@ -32,7 +32,8 @@ Stage 4 (ESI client) adds:
 - `ESI_DATASOURCE` — ESI `datasource` query param (`tranquility` vs `singularity`).
 
 Stage 10 (paste readers & connection lifecycle) adds:
-- `WORMHOLE_EOL_LIFETIME_MS` — time from EOL-stamp to reap (legacy `EXPIRE_CONNECTIONS_EOL`, 15300s / 4h15m). Read by Stage 11's EOL-expiry cron and the canvas EOL countdown.
+- `WORMHOLE_EOL_LIFETIME_MS` — time from the `eol` (4h) stage stamp to reap (legacy `EXPIRE_CONNECTIONS_EOL`, 15300s / 4h15m). Read by Stage 11's EOL-expiry cron and the canvas EOL countdown.
+- `WORMHOLE_EOL_CRITICAL_LIFETIME_MS` — time from the `critical` (1h) stage stamp to reap (4_500_000 ms / 1h15m; same 15-min safety buffer as the 4h stage). The newer of EVE's two EOL warnings selects this over `WORMHOLE_EOL_LIFETIME_MS`.
 - `WORMHOLE_DEFAULT_LIFETIME_MS` — default WH connection lifetime from creation (legacy `EXPIRE_CONNECTIONS_WH`, 172800s / 48h). Drives the "expires in X" hint before EOL is flagged, and the Stage 11 expired-wormhole cleanup cron's age cap.
 - `SIGNATURE_DEFAULT_TTL_MS` — default `expires_at` offset for newly created signatures (legacy `EXPIRE_SIGNATURES`, 259200s / 5d; matches SPEC §347).
 

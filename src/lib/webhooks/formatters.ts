@@ -112,8 +112,11 @@ function describeEvent(
     case 'connection.update': {
       const src = ctx.sourceSystemName ?? 'a system';
       const dst = ctx.targetSystemName ?? 'another system';
-      if (event.isEol === true) return `${who} marked **${src}** ↔ **${dst}** as EOL.`;
-      if (event.isEol === false) return `${who} cleared EOL on **${src}** ↔ **${dst}**.`;
+      if (event.eolStage === 'critical') {
+        return `${who} marked **${src}** ↔ **${dst}** as critical EOL (~1h).`;
+      }
+      if (event.eolStage === 'eol') return `${who} marked **${src}** ↔ **${dst}** as EOL (~4h).`;
+      if (event.eolStage === 'none') return `${who} cleared EOL on **${src}** ↔ **${dst}**.`;
       if (event.massStatus) {
         return `${who} marked **${src}** ↔ **${dst}** mass \`${event.massStatus}\`.`;
       }

@@ -40,6 +40,15 @@ export const whMass = pgEnum('wh_mass', ['fresh', 'reduced', 'critical']);
 export const whJumpMass = pgEnum('wh_jump_mass', ['s', 'm', 'l', 'xl']);
 
 /**
+ * End-of-life stage of a wormhole connection. EVE surfaces two decay warnings:
+ * `eol` ("reaching the end of its natural lifetime", ~4h left) and the newer
+ * `critical` final stage (~1h left). `none` is a hole not yet decaying. The
+ * stage selects which lifetime constant drives the countdown + EOL-expiry reap
+ * (`WORMHOLE_EOL_LIFETIME_MS` vs `WORMHOLE_EOL_CRITICAL_LIFETIME_MS`).
+ */
+export const eolStage = pgEnum('eol_stage', ['none', 'eol', 'critical']);
+
+/**
  * Outbound chat channel for `ap_map_webhook`. Stage 14 ships Discord only;
  * adding `'slack'` later is one `ALTER TYPE ap_webhook_channel ADD VALUE` plus
  * a sibling `src/lib/integrations/slack.ts`.

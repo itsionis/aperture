@@ -7,13 +7,13 @@
 xyflow `EdgeProps` with `data: ConnectionEdgeData` (`MapConnectionEdge & { parallelIndex: number; parallelCount: number }`) and `selected`.
 
 ### Renders
-A bezier `BaseEdge` styled via `connectionStyle` (scope→colour, wormhole recoloured by mass, EOL dashed, frigate thinned) plus a midpoint label of badges (`connectionBadges`: jump-mass, EOL, FRIG, ROLL, PRES) when any apply. When `isEol` is true the label also carries a live countdown ("23h", "2d", "expired") derived from `eolAt + apertureConfig.WORMHOLE_EOL_LIFETIME_MS`. When a travel pulse is active for this connection, a faint `TravelDot` (SVG `<circle>` r 3, opacity 0.55, edge stroke colour) with an `<animateMotion>` glides once along the curve.
+A bezier `BaseEdge` styled via `connectionStyle` (scope→colour, wormhole recoloured by mass, EOL dashed — tighter for the critical stage, frigate thinned) plus a midpoint label of badges (`connectionBadges`: jump-mass, `EOL`/`EOL 1h`, ROLL, PRES) when any apply. When `eolStage !== 'none'` the label also carries a live countdown ("23h", "2d", "expired") derived from `eolAt +` the per-stage lifetime constant. When a travel pulse is active for this connection, a faint `TravelDot` (SVG `<circle>` r 3, opacity 0.55, edge stroke colour) with an `<animateMotion>` glides once along the curve.
 
 ### Behaviour & Interactions
 - Selectable by click — `MapCanvas` consumes `onSelectionChange` and routes the selected edge into the sidebar inspector.
 - When `selected`, the stroke thickens by 1.5 px and a `drop-shadow` glow is applied in the current stroke colour to surface which edge the inspector is editing.
 - Label is `pointer-events-none` so clicks always hit the path, not the badge stack.
-- The EOL countdown is driven by an internal `useEolCountdown` hook that ticks once every 30s while `isEol` is true and is otherwise inert (no timer, no label entry).
+- The EOL countdown is driven by an internal `useEolCountdown` hook that ticks once every 30s while `eolStage !== 'none'` and is otherwise inert (no timer, no label entry).
 - Edits all live in the sidebar inspector (`InspectorModule.ConnectionInspector`).
 - Endpoint sides snap dynamically: `pickAnchors` reads source/target node geometry from `useInternalNode`, compares the centre-to-centre delta, and picks the dominant axis. `|dx| >= |dy|` → right/left; otherwise → bottom/top, oriented so the source side faces the target. The `sourceX/Y/Position` and `targetX/Y/Position` props xyflow passes (which derive from whichever handles the connection was created on) are only used as a fallback while the nodes haven't been measured yet.
 - Parallel edges (multiple wormholes between the same two systems): `parallelIndex`/`parallelCount` from `ConnectionEdgeData` drive a perpendicular `offset` passed to `pickAnchors` — 12 px per step, centred around 0. For two parallel connections the offsets are −6/+6 px; for three: −12/0/+12 px. The offset shifts the anchor along the node face so each line exits from a visually distinct point.

@@ -62,7 +62,7 @@ export function applyEvent(state: MapViewData, payload: MapEventPayload): MapVie
           if (payload.scope !== undefined) next.scope = payload.scope;
           if (payload.massStatus !== undefined) next.massStatus = payload.massStatus;
           if (payload.jumpMassClass !== undefined) next.jumpMassClass = payload.jumpMassClass;
-          if (payload.isEol !== undefined) next.isEol = payload.isEol;
+          if (payload.eolStage !== undefined) next.eolStage = payload.eolStage;
           if (payload.preserveMass !== undefined) next.preserveMass = payload.preserveMass;
           if (payload.isRolling !== undefined) next.isRolling = payload.isRolling;
           if (payload.eolAt !== undefined) next.eolAt = payload.eolAt;

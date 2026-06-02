@@ -17,6 +17,7 @@ import type {
 } from '@/types';
 import type {
   ConnectionScope,
+  EolStage,
   SystemStatus,
   WhJumpMass,
   WhMass,
@@ -63,7 +64,7 @@ export type CreateConnectionBody = {
   scope: ConnectionScope;
   massStatus?: WhMass;
   jumpMassClass?: WhJumpMass | null;
-  isEol?: boolean;
+  eolStage?: EolStage;
   preserveMass?: boolean;
   isRolling?: boolean;
 };
@@ -72,7 +73,7 @@ export type UpdateConnectionBody = {
   scope?: ConnectionScope;
   massStatus?: WhMass;
   jumpMassClass?: WhJumpMass | null;
-  isEol?: boolean;
+  eolStage?: EolStage;
   preserveMass?: boolean;
   isRolling?: boolean;
 };

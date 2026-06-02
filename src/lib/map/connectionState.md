@@ -1,6 +1,6 @@
 ## connectionState.ts
 
-**Purpose:** Pure client-side helpers that derive a wormhole connection's expiry instant / time remaining from `eolAt` / `createdAt` and the lifetime constants in `aperture.config.ts`. Drives the EOL countdown badge on `ConnectionEdge` and the "Expires in X" inspector hint.
+**Purpose:** Pure client-side helpers that derive a wormhole connection's expiry instant / time remaining from `eolStage` / `eolAt` / `createdAt` and the lifetime constants in `aperture.config.ts`. Drives the EOL countdown badge on `ConnectionEdge` and the "Expires in X" inspector hint.
 **File:** `src/lib/map/connectionState.ts`
 
 ---
@@ -8,13 +8,14 @@
 ### connectionExpiresAt(c: ConnectionLifecycleInput): Date | null
 Wall-clock instant the connection expires, or `null` when no expiry applies.
 
-- Wormhole + `isEol`: `eolAt + WORMHOLE_EOL_LIFETIME_MS`.
-- Wormhole + not EOL: `createdAt + WORMHOLE_DEFAULT_LIFETIME_MS`.
+- Wormhole + `eolStage === 'critical'`: `eolAt + WORMHOLE_EOL_CRITICAL_LIFETIME_MS` (~1h15m).
+- Wormhole + `eolStage === 'eol'`: `eolAt + WORMHOLE_EOL_LIFETIME_MS` (~4h15m).
+- Wormhole + `eolStage === 'none'`: `createdAt + WORMHOLE_DEFAULT_LIFETIME_MS`.
 - Stargate / jumpbridge / abyssal: `null` (these connections never expire — the EOL state machine only applies to wormholes).
-- EOL flagged but `eolAt` is null (stale-snapshot defence): `null`.
+- EOL stage set but `eolAt` is null (stale-snapshot defence): `null`.
 
 **Parameters:**
-- `c` — a `Pick<MapConnectionEdge, 'scope' | 'isEol' | 'eolAt' | 'createdAt'>`.
+- `c` — a `Pick<MapConnectionEdge, 'scope' | 'eolStage' | 'eolAt' | 'createdAt'>`.
 
 **Returns:** `Date` or `null`.
 
@@ -26,4 +27,4 @@ Milliseconds until `connectionExpiresAt(c)`. Returns `null` for non-expiring con
 ---
 
 ### ConnectionLifecycleInput
-Type alias for `Pick<MapConnectionEdge, 'scope' | 'isEol' | 'eolAt' | 'createdAt'>` — the minimal shape the helpers consume.
+Type alias for `Pick<MapConnectionEdge, 'scope' | 'eolStage' | 'eolAt' | 'createdAt'>` — the minimal shape the helpers consume.

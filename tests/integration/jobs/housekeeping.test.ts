@@ -196,8 +196,8 @@ describe.skipIf(!run)('Stage 11.2 housekeeping jobs (real Postgres)', () => {
 
   // ─── eol-expiry ────────────────────────────────────────────────────────────
 
-  it('eolExpiry deletes only EOL connections older than the threshold on opted-in maps', async () => {
-    // Active map: one stale EOL (should die), one fresh EOL (should survive).
+  it('eolExpiry deletes EOL connections past their per-stage threshold on opted-in maps', async () => {
+    // Active map, `eol` (4h15m) stage: stale (5h, dies) + fresh (1h, survives).
     const [staleEol] = await db
       .insert(apMapConnection)
       .values({
@@ -205,7 +205,7 @@ describe.skipIf(!run)('Stage 11.2 housekeeping jobs (real Postgres)', () => {
         sourceMapSystemId: mapSystemA,
         targetMapSystemId: mapSystemB,
         scope: 'wh',
-        isEol: true,
+        eolStage: 'eol',
         eolAt: sql`now() - interval '5 hours'`,
       })
       .returning({ id: apMapConnection.id });
@@ -216,8 +216,33 @@ describe.skipIf(!run)('Stage 11.2 housekeeping jobs (real Postgres)', () => {
         sourceMapSystemId: mapSystemA,
         targetMapSystemId: mapSystemB,
         scope: 'wh',
-        isEol: true,
+        eolStage: 'eol',
         eolAt: sql`now() - interval '1 hour'`,
+      })
+      .returning({ id: apMapConnection.id });
+    // Active map, `critical` (1h15m) stage: stale (90m, dies) + fresh (30m,
+    // survives) — proving the shorter critical threshold, since both would
+    // survive under the 4h15m `eol` threshold.
+    const [staleCritical] = await db
+      .insert(apMapConnection)
+      .values({
+        mapId: activeMapId,
+        sourceMapSystemId: mapSystemA,
+        targetMapSystemId: mapSystemB,
+        scope: 'wh',
+        eolStage: 'critical',
+        eolAt: sql`now() - interval '90 minutes'`,
+      })
+      .returning({ id: apMapConnection.id });
+    const [freshCritical] = await db
+      .insert(apMapConnection)
+      .values({
+        mapId: activeMapId,
+        sourceMapSystemId: mapSystemA,
+        targetMapSystemId: mapSystemB,
+        scope: 'wh',
+        eolStage: 'critical',
+        eolAt: sql`now() - interval '30 minutes'`,
       })
       .returning({ id: apMapConnection.id });
     // Opt-out map: stale EOL that should survive because the map opted out.
@@ -228,33 +253,42 @@ describe.skipIf(!run)('Stage 11.2 housekeeping jobs (real Postgres)', () => {
         sourceMapSystemId: optOutSystemA,
         targetMapSystemId: optOutSystemB,
         scope: 'wh',
-        isEol: true,
+        eolStage: 'eol',
         eolAt: sql`now() - interval '5 hours'`,
       })
       .returning({ id: apMapConnection.id });
 
     await eolExpiry.run(null, FAKE_HELPERS);
 
+    const ids = [
+      staleEol!.id,
+      freshEol!.id,
+      staleCritical!.id,
+      freshCritical!.id,
+      optOutStale!.id,
+    ];
     const survivors = await db
       .select({ id: apMapConnection.id })
       .from(apMapConnection)
-      .where(inArray(apMapConnection.id, [staleEol!.id, freshEol!.id, optOutStale!.id]));
-    expect(new Set(survivors.map((r) => r.id))).toEqual(new Set([freshEol!.id, optOutStale!.id]));
+      .where(inArray(apMapConnection.id, ids));
+    expect(new Set(survivors.map((r) => r.id))).toEqual(
+      new Set([freshEol!.id, freshCritical!.id, optOutStale!.id]),
+    );
 
     const events = await db
       .select({ kind: apMapEvent.kind })
       .from(apMapEvent)
       .where(and(eq(apMapEvent.mapId, activeMapId), eq(apMapEvent.kind, 'connection.delete')));
-    expect(events.length).toBeGreaterThanOrEqual(1);
+    expect(events.length).toBeGreaterThanOrEqual(2);
 
     const runRow = await lastJobRun('eol-expiry');
     expect(runRow!.success).toBe(true);
-    expect(runRow!.notes).toMatchObject({ deleted: 1, failed: 0 });
+    expect(runRow!.notes).toMatchObject({ deleted: 2, failed: 0 });
 
     // Clean up the survivors so the next test starts from a known state.
     await db
       .delete(apMapConnection)
-      .where(inArray(apMapConnection.id, [freshEol!.id, optOutStale!.id]));
+      .where(inArray(apMapConnection.id, [freshEol!.id, freshCritical!.id, optOutStale!.id]));
   });
 
   // ─── expired-connections ──────────────────────────────────────────────────
