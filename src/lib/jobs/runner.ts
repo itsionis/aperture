@@ -48,8 +48,42 @@ export async function startWorker(extraModules: readonly JobModule[] = []): Prom
   if (activeRunner) return activeRunner;
   const opts = baseOptions(extraModules);
   await runMigrations(opts);
+  await rearmLocationPollLoop();
   activeRunner = await graphileRun(opts);
   return activeRunner;
+}
+
+/**
+ * Re-arm the location-poll loop after an unclean shutdown, on boot before the
+ * pool starts. `server.ts` releases worker locks gracefully on SIGTERM/SIGINT,
+ * but a crash (OOM / SIGKILL / power loss) — or, in dev, `tsx watch` hard-killing
+ * the child on Windows — bypasses that. graphile-worker only reclaims an orphaned
+ * lock after a hardcoded 4h (`get_job` / `resetLockedAt`, not configurable in
+ * 0.16). Most tasks tolerate that wait (retryable, not singletons), but
+ * `location-poll` is a single self-perpetuating job per character: a stuck lock
+ * silently stops that character's tracking for up to 4h, and even an immediate
+ * restart can't recover it because the fresh worker won't touch the locked row.
+ *
+ * Scoped to `location-poll` only. It is idempotent (the jump fold dedupes and the
+ * re-enqueue uses `jobKey: 'replace'`), so the worst case under an overlapping
+ * deploy is one character double-polling for a single tick. We deliberately do
+ * NOT blanket-unlock every task — a long, non-idempotent job (e.g. `sdeIngest`)
+ * legitimately held by a still-draining instance must not be yanked out from
+ * under it, which is why a worker-scoped `force_unlock_workers` is wrong here.
+ * The SET clause mirrors graphile-worker's own `resetLockedAt`.
+ */
+async function rearmLocationPollLoop(): Promise<void> {
+  const res = await pool.query(
+    `UPDATE graphile_worker._private_jobs
+        SET locked_at = NULL, locked_by = NULL, run_at = GREATEST(run_at, now())
+      WHERE locked_at IS NOT NULL AND key LIKE 'location-poll:%'`,
+  );
+  if (res.rowCount && res.rowCount > 0) {
+    console.log(
+      'graphile-worker: re-armed %d orphaned location-poll job(s) after an unclean shutdown',
+      res.rowCount,
+    );
+  }
 }
 
 /**
