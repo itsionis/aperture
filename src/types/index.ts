@@ -340,3 +340,15 @@ export type UnderglowConfig = {
   /** Duration of one pulse cycle in ms. */
   speedMs: number;
 };
+
+/**
+ * A right-click target on the map canvas, carrying both the kind/id of what was
+ * clicked and the client (screen) coordinates of the cursor used to anchor the
+ * context menu. `null` ⇒ no menu open. `system`/`connection` carry the row id;
+ * `pane` is the empty-canvas background. Right-click does not change selection —
+ * the menu operates on `id` directly.
+ */
+export type MapContextMenuTarget =
+  | { kind: 'system'; id: string; x: number; y: number }
+  | { kind: 'connection'; id: string; x: number; y: number }
+  | { kind: 'pane'; x: number; y: number };

@@ -18,6 +18,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type {
+  MapContextMenuTarget,
   MapEventPayload,
   MapSettings,
   MapSystemNode,
@@ -80,6 +81,7 @@ import { MapTravelProvider, TravelBridge } from './MapTravelContext';
 import { MapUnderglowProvider } from './MapUnderglowContext';
 import { MapUnderglowBridge } from './MapUnderglowBridge';
 import { SystemNode, type SystemNodeData } from './SystemNode';
+import { MapContextMenu } from './MapContextMenu';
 
 const nodeTypes = { system: SystemNode };
 const edgeTypes = { connection: ConnectionEdge };
@@ -114,6 +116,9 @@ export function MapCanvas({
   // replaced with a fresh Set (never mutated) — the render-time sync block
   // detects changes by reference equality.
   const [selectedSystemIds, setSelectedSystemIds] = useState<Set<string>>(() => new Set());
+  // Right-click context-menu target (independent of selection — right-click does
+  // not change `selected`/`selectedSystemIds`). `null` ⇒ no menu open.
+  const [contextMenu, setContextMenu] = useState<MapContextMenuTarget | null>(null);
   const [mapInfoOpen, setMapInfoOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addSystemOpen, setAddSystemOpen] = useState(false);
@@ -371,6 +376,23 @@ export function MapCanvas({
   const onPaneClick = useCallback(() => {
     setSelected(null);
     setSelectedSystemIds(new Set());
+  }, []);
+
+  // Right-click handlers. Each suppresses the native browser menu and stores the
+  // cursor point + target; selection is intentionally left untouched.
+  const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
+    event.preventDefault();
+    setContextMenu({ kind: 'system', id: node.id, x: event.clientX, y: event.clientY });
+  }, []);
+
+  const onEdgeContextMenu = useCallback((event: React.MouseEvent, edge: Edge) => {
+    event.preventDefault();
+    setContextMenu({ kind: 'connection', id: edge.id, x: event.clientX, y: event.clientY });
+  }, []);
+
+  const onPaneContextMenu = useCallback((event: MouseEvent | React.MouseEvent) => {
+    event.preventDefault();
+    setContextMenu({ kind: 'pane', x: event.clientX, y: event.clientY });
   }, []);
 
   const onSelectionStart = useCallback(() => {
@@ -748,6 +770,9 @@ export function MapCanvas({
                 onNodeClick={onNodeClick}
                 onEdgeClick={onEdgeClick}
                 onPaneClick={onPaneClick}
+                onNodeContextMenu={onNodeContextMenu}
+                onEdgeContextMenu={onEdgeContextMenu}
+                onPaneContextMenu={onPaneContextMenu}
                 onSelectionStart={onSelectionStart}
                 onSelectionEnd={onSelectionEnd}
                 onSelectionChange={onSelectionChange}
@@ -778,6 +803,7 @@ export function MapCanvas({
                 <Background />
                 <Controls showInteractive={false} />
               </ReactFlow>
+              <MapContextMenu target={contextMenu} onClose={() => setContextMenu(null)} />
             </div>
 
             {/* Drag handle — resizes the map canvas; sigs panel stays at full height below */}

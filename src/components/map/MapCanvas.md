@@ -40,6 +40,7 @@ An unbounded two-column layout (the page scrolls). The wide left column stacks a
   - The `selected` flag is reflected back into each xyflow node (`selected: selectedSystemIds.has(s.id)`) / edge (from the primary ref) so rebuilding the arrays on a `viewData` change (e.g. an optimistic patch or realtime rebuild) does not wipe selection.
   - A box drag ends up **identical to Ctrl+click**: the same controlled `selected` flags highlight the nodes, and xyflow's persistent bounding box (`.react-flow__nodesselection`) is hidden via a global CSS rule (`src/app/globals.css`) so there is no tight-box overlay and group drag flows through `onNodeDragStop`. The live drag rectangle (`.react-flow__selection`) is a different element and stays visible during the drag.
 - Group delete: a `removeSelectedSystems` callback loops the existing single-item `removeSystemOnServer` over `selectedSystemIds` (each via `runOptimistic`), then clears selection — the `onBulkPaste` precedent, no batch endpoint. Triggered by **both** a `document` `keydown` listener on `Delete`/`Backspace` (gated to do nothing when the event target is an `INPUT`/`TEXTAREA`/`isContentEditable`, so typing in inspector/signature fields is safe) **and** a floating destructive "Remove N" button (`Trash2` icon, `nodrag nopan`, top-right of the canvas, `z-10`) rendered only when `selectedSystemIds.size > 1`.
+- Right-click context menu: `onNodeContextMenu` / `onEdgeContextMenu` / `onPaneContextMenu` each `preventDefault()` the native browser menu and set `contextMenu` to a `MapContextMenuTarget` (`{ kind, id?, x, y }`) from the cursor's client coords. **Selection is left untouched** — the menu operates on its own `id`. Rendered by `<MapContextMenu>` (a sibling of `<ReactFlow>` inside the canvas wrapper); it closes via `onClose` → `setContextMenu(null)` (outside click / Escape / item select). Menu bodies are stubbed (one disabled placeholder per kind) pending real items.
 - Alias and tag: the system tile's `InlineTextEdit` calls back into `MapCanvas`'s `onSystemPatch` via the per-node `onAliasOrTagCommit` injected through `data`.
 - Home marker: each node's `data.isHome` is derived in both node builders (initial + the `viewData` sync) as `s.id === viewData.map.homeMapSystemId`, so the designated Home tile renders its accent ring + icon (see `SystemNode`). Home is a load-time map property (not realtime), so it only changes on a fresh map load.
 - Structure intel: `structures` is plain local state seeded from the page load. `onStructureCreate`/`onStructurePatch`/`onStructureDelete` await the `@/lib/structures/client` REST wrappers and fold the returned `StructureIntel` into local state on success. These are **not** map events and have no realtime echo (structures are deployment-global, not map-scoped), so there is no `applyEvent` / `appliedEventIds` involvement and another user's edits appear only on the next page load.
@@ -61,7 +62,7 @@ An unbounded two-column layout (the page scrolls). The wide left column stacks a
 - Threads `viewData.connections` and `viewData.systems` into `SignatureModule` so its `ConnectionSelect` can list connections incident to the active system without an API call.
 
 ### Depends On
-- `@xyflow/react`, `./SystemNode`, `./ConnectionEdge`, `./MapPresenceContext`, `./MapTravelContext`, `./MapUnderglowContext`, `./MapUnderglowBridge`, `./SignaturePasteHotkey`
+- `@xyflow/react`, `./SystemNode`, `./ConnectionEdge`, `./MapContextMenu`, `./MapPresenceContext`, `./MapTravelContext`, `./MapUnderglowContext`, `./MapUnderglowBridge`, `./SignaturePasteHotkey`
 - `@/components/dialogs/MapInfoDialog`, `@/components/dialogs/MapSettingsDialog`, `./AddSystemDialog`, `@/components/ui/button`
 - `RouteModule`, `KillStatsModule`, `InspectorModule`, `SignatureModule`
 - `IntelModule`, `StructureModule`, `SystemGraphModule`, `SystemKillboardModule` (both self-fetch per-selected-system from `/api/system/[id]/…`)
@@ -76,6 +77,7 @@ An unbounded two-column layout (the page scrolls). The wide left column stacks a
 ### Local State
 - `selected: SelectionRef | null` — primary (anchor) selection; drives the inspector and all sidebar modules.
 - `selectedSystemIds: Set<string>` — the multi-select group (always replaced, never mutated). `size <= 1` is the legacy single-select regime. Drives each node's `selected` flag and the floating "Remove N" button.
+- `contextMenu: MapContextMenuTarget | null` — the active right-click target (kind + id + cursor x/y); `null` ⇒ no menu open. Independent of `selected`/`selectedSystemIds`.
 - `mapInfoOpen: boolean` — whether the `MapInfoDialog` is open.
 - `settingsOpen: boolean` — whether the `MapSettingsDialog` is open.
 - `addSystemOpen: boolean` — whether the `AddSystemDialog` is open.
