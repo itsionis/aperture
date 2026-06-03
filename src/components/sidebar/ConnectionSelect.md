@@ -13,6 +13,7 @@
 | value | string \| null | yes | The currently bound `ap_map_connection.id`, or `null`. |
 | onValueChange | (next: string \| null) => void | yes | Fires when the user picks a different option (or clears). |
 | disabled | boolean | no | Disables the trigger. Auto-disabled when no incident connections exist. |
+| targetClass | string \| null | no | Selected WH type's destination class (e.g. `LS`). When set, filters options to far ends matching that class; the bound `value` is always kept. `null`/omitted = no filter (e.g. K162 leads anywhere). |
 
 ### Renders
 A shadcn `Select` listing each incident connection. Each option uses a flex `justify-between` layout: system name on the left, concatenated class+tag (e.g. "C2G") in a muted span on the right. First option is an "—" sentinel mapped to `null`.
@@ -21,6 +22,7 @@ A shadcn `Select` listing each incident connection. Each option uses a flex `jus
 - No API call — works entirely off the props passed by `MapCanvas`.
 - Auto-disables when the active system has no connections.
 - Treats `__none__` as `null` in both directions.
+- When `targetClass` is set, options are filtered to connections whose far-end `security` equals it (e.g. a U210 → `LS` only lists lowsec exits). The currently-bound connection (`value`) is never filtered out, so changing the WH type after binding doesn't blank the trigger.
 
 ### Depends On
 - `Select*` from `@/components/ui/select`

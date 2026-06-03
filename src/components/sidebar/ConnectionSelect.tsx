@@ -18,6 +18,13 @@ const NONE_VALUE = '__none__';
  * security/class (when known). Used in `SignatureModule` to bind a wormhole
  * signature to a placed connection. No API call — driven entirely off the
  * canvas's already-loaded `connections` and `systems`.
+ *
+ * When `targetClass` is set (the selected WH type's destination class, e.g.
+ * `LS` for a U210), the list is filtered to connections whose far end matches
+ * that class — a U210 can only ever lead to lowsec. The currently-bound
+ * connection is always kept in the list so changing the type after binding
+ * doesn't blank the trigger. A null `targetClass` (e.g. K162) means "leads
+ * anywhere", so no filtering is applied.
  */
 export function ConnectionSelect({
   system,
@@ -26,6 +33,7 @@ export function ConnectionSelect({
   value,
   onValueChange,
   disabled,
+  targetClass,
 }: {
   system: MapSystemNode;
   connections: MapConnectionEdge[];
@@ -33,6 +41,7 @@ export function ConnectionSelect({
   value: string | null;
   onValueChange: (next: string | null) => void;
   disabled?: boolean;
+  targetClass?: string | null;
 }) {
   const options = useMemo(() => {
     const systemsById = new Map(systems.map((s) => [s.id, s]));
@@ -44,10 +53,14 @@ export function ConnectionSelect({
         if (!other) return null;
         const label = other.alias ?? other.name;
         const cls = [other.security, other.tag].filter(Boolean).join('');
-        return { id: c.id, label, cls };
+        return { id: c.id, label, cls, security: other.security };
       })
-      .filter((x): x is { id: string; label: string; cls: string } => x !== null);
-  }, [connections, systems, system.id]);
+      .filter(
+        (x): x is { id: string; label: string; cls: string; security: string | null } =>
+          x !== null,
+      )
+      .filter((o) => !targetClass || o.security === targetClass || o.id === value);
+  }, [connections, systems, system.id, targetClass, value]);
 
   const items = useMemo(() => {
     const labels: Record<string, string> = { [NONE_VALUE]: '—' };

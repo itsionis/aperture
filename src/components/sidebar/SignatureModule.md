@@ -29,7 +29,7 @@ A `Card` with:
   - `wormhole` → `WormholeTypeSelect`. Picks a `universe_wormhole` row; writes `typeId`.
   - cosmic groups → `SiteTypeCombobox` bound to `sig.name`: class+group-filtered site-name suggestions (from `signatureSites.ts`, keyed off `system.security`) with a free-text fallback; patches on blur.
   - `null` (unknown) → italic placeholder text.
-- **Leads-to cell** is `ConnectionSelect`, enabled only for `groupKey === 'wormhole'`.
+- **Leads-to cell** is `ConnectionSelect`, enabled only for `groupKey === 'wormhole'`. Its options are filtered to the selected WH type's destination class via the `targetClass` prop: `useWormholeTargetClasses(mapId, system.systemId)` builds a `typeId → targetClass` map (reusing the cached `fetchWormholeTypes` data), and the row/draft pass the entry for `sig.typeId` / `draftTypeId`. A type with no/unknown target (e.g. K162) passes `null` → unfiltered.
 - **Description cell** uses `EditableTextCell` to patch `sig.description` on blur.
 - **`EditableTextCell`** is a small internal helper: a controlled `Input` with a local draft, committed on blur. It re-syncs from `value` only when the input isn't focused, so optimistic-apply and realtime updates don't clobber mid-edit typing. Controlled-mode also avoids Base UI's "uncontrolled `FieldControl` default value changed after init" warning that fires when the parent re-renders with a new `defaultValue` after a blur-triggered patch.
 - Filters incoming `signatures` to the current system by `mapSystemId`.
@@ -43,5 +43,6 @@ A `Card` with:
 - `Card`, `Button`, `Input` from `@/components/ui/*`
 - `labelForSignatureGroupKey` from `@/lib/map/signatureGroups`
 - `formatRelativeFromMs`, `formatAgoFromMs` from `@/lib/map/relativeTime`
+- `fetchWormholeTypes` from `@/lib/map/client` (target-class map for the Leads-to filter)
 - `apertureConfig` (`SIGNATURE_DEFAULT_TTL_MS`) from `aperture.config`
 - Types: `MapConnectionEdge`, `MapEventPayload`, `MapSignature`, `MapSystemNode`, `SignatureGroupKey` from `@/types`; body types from `@/lib/map/client`

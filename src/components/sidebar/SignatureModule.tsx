@@ -21,6 +21,7 @@ import type {
   CreateSignatureBody,
   UpdateSignatureBody,
 } from '@/lib/map/client';
+import { fetchWormholeTypes } from '@/lib/map/client';
 import { formatAgoFromMs, formatRelativeFromMs } from '@/lib/map/relativeTime';
 import { apertureConfig } from '../../../aperture.config';
 
@@ -38,6 +39,31 @@ function formatAgoIso(iso: string): string {
   const ts = new Date(iso).getTime();
   if (Number.isNaN(ts)) return iso;
   return formatAgoFromMs(Date.now() - ts);
+}
+
+/**
+ * Resolves `universe_wormhole.type_id` → destination class label (e.g. U210 →
+ * `LS`) for the host system, so the "Leads to" dropdown can filter to
+ * connections the selected WH type could actually open onto. Reads from the
+ * same per-(mapId, systemId) cache `WormholeTypeSelect` populates, so this is
+ * usually a free in-memory hit rather than a second network round-trip.
+ */
+function useWormholeTargetClasses(
+  mapId: string,
+  universeSystemId: number,
+): Map<number, string | null> {
+  const [byTypeId, setByTypeId] = useState<Map<number, string | null>>(new Map());
+  useEffect(() => {
+    let cancelled = false;
+    fetchWormholeTypes({ mapId, universeSystemId }).then((result) => {
+      if (cancelled || !result.ok) return;
+      setByTypeId(new Map(result.data.map((o) => [o.typeId, o.targetClass])));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mapId, universeSystemId]);
+  return byTypeId;
 }
 
 /**
@@ -169,6 +195,8 @@ function SignaturePanelBody({
     [signatures, system.id],
   );
 
+  const targetClassByTypeId = useWormholeTargetClasses(mapId, system.systemId);
+
   const [draftSigId, setDraftSigId] = useState('');
   const [draftGroupKey, setDraftGroupKey] = useState<SignatureGroupKey | null>(null);
   const [draftName, setDraftName] = useState('');
@@ -277,6 +305,9 @@ function SignaturePanelBody({
                       onPatch(sig.id, { mapConnectionId: next })
                     }
                     disabled={sig.groupKey !== 'wormhole'}
+                    targetClass={
+                      sig.typeId == null ? null : targetClassByTypeId.get(sig.typeId) ?? null
+                    }
                   />
                 </td>
                 <td className="px-1 py-1.5 text-xs text-muted-foreground">
@@ -357,6 +388,9 @@ function SignaturePanelBody({
               systems={systems}
               value={draftConnectionId}
               onValueChange={setDraftConnectionId}
+              targetClass={
+                draftTypeId == null ? null : targetClassByTypeId.get(draftTypeId) ?? null
+              }
             />
           </div>
         )}
