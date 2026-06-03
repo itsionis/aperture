@@ -130,6 +130,10 @@ export function MapCanvas({
     Edge<ConnectionEdgeData>
   > | null>(null);
   const flowWrapperRef = useRef<HTMLDivElement>(null);
+  // Client-space point set by the pane "Add system" action; consumed by the next
+  // `onAddSystem` so the added node lands where the user right-clicked rather than
+  // at the selection/viewport-centre default. Cleared once read.
+  const pendingAddPoint = useRef<{ x: number; y: number } | null>(null);
   // True only while a drag-box selection is in progress. `onSelectionChange`
   // fires for our own click-driven selection echoes too; without this gate the
   // reconciler would fight the click handlers and loop. Box drag is the only
@@ -315,7 +319,13 @@ export function MapCanvas({
     (systemId: number) => {
       const occupied: Point[] = viewData.systems.map((s) => ({ x: s.positionX, y: s.positionY }));
       let anchor: Point | null = null;
-      if (selected?.kind === 'system') {
+      const pending = pendingAddPoint.current;
+      if (pending) {
+        pendingAddPoint.current = null;
+        const inst = flowInstance.current;
+        if (inst) anchor = inst.screenToFlowPosition({ x: pending.x, y: pending.y });
+      }
+      if (!anchor && selected?.kind === 'system') {
         const sel = viewData.systems.find((s) => s.id === selected.id);
         if (sel) anchor = { x: sel.positionX, y: sel.positionY };
       }
@@ -343,6 +353,14 @@ export function MapCanvas({
     },
     [mapId, awaitServer, selected, viewData.systems],
   );
+
+  // Pane "Add system" entry point: remember the cursor point so `onAddSystem`
+  // places the chosen system there, then open the existing picker dialog.
+  const onAddSystemAt = useCallback((clientX: number, clientY: number) => {
+    pendingAddPoint.current = { x: clientX, y: clientY };
+    setContextMenu(null);
+    setAddSystemOpen(true);
+  }, []);
 
   // Click selection is driven by direct handlers (they own single + Ctrl+click
   // toggle), while `onSelectionChange` is used only as a box-select reconciler
@@ -803,7 +821,17 @@ export function MapCanvas({
                 <Background />
                 <Controls showInteractive={false} />
               </ReactFlow>
-              <MapContextMenu target={contextMenu} onClose={() => setContextMenu(null)} />
+              <MapContextMenu
+                target={contextMenu}
+                onClose={() => setContextMenu(null)}
+                systems={viewData.systems}
+                connections={viewData.connections}
+                onSystemPatch={onSystemPatch}
+                onSystemRemove={onSystemRemove}
+                onConnectionPatch={onConnectionPatch}
+                onConnectionDelete={onConnectionDelete}
+                onAddSystemAt={onAddSystemAt}
+              />
             </div>
 
             {/* Drag handle — resizes the map canvas; sigs panel stays at full height below */}
