@@ -61,7 +61,7 @@ function SelectItem({ className, children, ...props }: SelectPrimitive.Item.Prop
       <SelectPrimitive.ItemIndicator className="absolute left-2 flex items-center">
         <CheckIcon className="size-3.5" />
       </SelectPrimitive.ItemIndicator>
-      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      <SelectPrimitive.ItemText className="min-w-0 flex-1">{children}</SelectPrimitive.ItemText>
     </SelectPrimitive.Item>
   )
 }

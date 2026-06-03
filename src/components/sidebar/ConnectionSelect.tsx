@@ -43,7 +43,7 @@ export function ConnectionSelect({
         const other = systemsById.get(otherId);
         if (!other) return null;
         const label = other.alias ?? other.name;
-        const cls = other.security ?? '';
+        const cls = [other.security, other.tag].filter(Boolean).join('');
         return { id: c.id, label, cls };
       })
       .filter((x): x is { id: string; label: string; cls: string } => x !== null);
@@ -76,10 +76,12 @@ export function ConnectionSelect({
         <SelectItem value={NONE_VALUE}>—</SelectItem>
         {options.map((o) => (
           <SelectItem key={o.id} value={o.id}>
-            {o.label}
-            {o.cls ? (
-              <span className="ml-1 text-xs text-muted-foreground">{o.cls}</span>
-            ) : null}
+            <span className="flex w-full justify-between gap-4">
+              <span>{o.label}</span>
+              {o.cls ? (
+                <span className="text-xs text-muted-foreground">{o.cls}</span>
+              ) : null}
+            </span>
           </SelectItem>
         ))}
       </SelectContent>

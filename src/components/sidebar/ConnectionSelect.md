@@ -15,7 +15,7 @@
 | disabled | boolean | no | Disables the trigger. Auto-disabled when no incident connections exist. |
 
 ### Renders
-A shadcn `Select` listing each incident connection. Each option label is the other end's `alias ?? name`; when known, the security/class string is appended (e.g. "Liekuri (high)", "J231245 (C3)"). First option is an "—" sentinel mapped to `null`.
+A shadcn `Select` listing each incident connection. Each option uses a flex `justify-between` layout: system name on the left, concatenated class+tag (e.g. "C2G") in a muted span on the right. First option is an "—" sentinel mapped to `null`.
 
 ### Behaviour & Interactions
 - No API call — works entirely off the props passed by `MapCanvas`.
