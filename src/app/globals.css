@@ -158,3 +158,18 @@
 .react-flow__nodesselection {
   display: none;
 }
+
+/* react-grid-layout (map dashboard) theming. RGL's stock stylesheet draws a
+   near-black resize-handle arrow (rgba(0,0,0,0.4)) and a bright-red drag
+   placeholder — both wrong against the dark card surface. The `.react-grid-layout`
+   ancestor raises specificity over the imported defaults regardless of CSS order.
+   See src/components/map/layout/MapLayoutGrid.tsx / MapPanel.tsx. */
+.react-grid-layout .react-grid-item > .react-resizable-handle::after {
+  border-right-color: var(--muted-foreground);
+  border-bottom-color: var(--muted-foreground);
+}
+.react-grid-layout .react-grid-item.react-grid-placeholder {
+  background: var(--primary);
+  border-radius: var(--radius);
+  opacity: 0.15;
+}

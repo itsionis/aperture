@@ -10,6 +10,7 @@ import { isMapOwnerOrAdmin } from '@/lib/auth/rights';
 import {
   getAccountCharacters,
   getConnectionTravelAnimation,
+  getMapLayout,
   requireSession,
 } from '@/lib/session';
 
@@ -54,6 +55,7 @@ export default async function MapPage({ params }: { params: Promise<{ slug?: str
     travelAnimation,
     canConfigureTagging,
     accountCharacters,
+    mapLayout,
   ] = await Promise.all([
     routesForSystems(systemIds),
     statsForSystems(systemIds),
@@ -63,6 +65,7 @@ export default async function MapPage({ params }: { params: Promise<{ slug?: str
     getConnectionTravelAnimation(session.userId),
     isMapOwnerOrAdmin(BigInt(session.characterId), mapId),
     getAccountCharacters(session.userId),
+    getMapLayout(session.userId),
   ]);
 
   // Match the CTRL+V paste target against where any of the viewer's pilots are.
@@ -95,6 +98,7 @@ export default async function MapPage({ params }: { params: Promise<{ slug?: str
         travelAnimation={travelAnimation}
         canConfigureTagging={canConfigureTagging}
         viewerCharacterIds={viewerCharacterIds}
+        mapLayout={mapLayout}
       />
     </div>
   );

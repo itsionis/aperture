@@ -1,4 +1,5 @@
-import { bigint, boolean, integer, pgTable, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, boolean, integer, jsonb, pgTable, timestamp } from 'drizzle-orm/pg-core';
+import type { MapLayoutConfig } from '@/types';
 
 // SPEC §9 auth principals: a user owns one or more characters. Stage 2 creates
 // one user per newly-seen character; linking additional characters onto an
@@ -14,6 +15,10 @@ export const apUser = pgTable('ap_user', {
   // Per-account toggle for the connection travel animation (a subtle moving dot
   // along a connection when a tracked pilot jumps across it). On by default.
   connectionTravelAnimation: boolean('connection_travel_animation').notNull().default(true),
+  // map-layout-builder: the account's free-form map dashboard arrangement — one
+  // global layout applied to every map this user opens. Nullable; NULL ⇒ the
+  // client falls back to DEFAULT_MAP_LAYOUT (no per-account row is seeded).
+  mapLayout: jsonb('map_layout').$type<MapLayoutConfig>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

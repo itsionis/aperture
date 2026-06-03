@@ -17,6 +17,11 @@ Sets `ap_user.connection_travel_animation` for the current account. Revalidates 
 
 ---
 
+### setMapLayoutAction(config: unknown): Promise<AccountActionResult>
+Persists the account's free-form map dashboard layout (map-layout-builder) to `ap_user.map_layout`. `config` is unknown user JSON (posted by the grid's debounced save) — validated at this boundary with `mapLayoutConfigSchema` (`src/lib/map/layout/schema.ts`); a parse failure returns `{ ok: false, error: 'Invalid layout.' }`. On success updates the column + `updated_at`, revalidates the `/` layout so a freshly-rendered map picks up the arrangement, and returns `{ ok: true }`. One global layout per account, applied to every map.
+
+---
+
 ### deleteAccountAction(): Promise<AccountActionResult>
 Hard-deletes the `ap_user` row for the current session. The FK cascade removes characters / roles / tracking; `ap_map_event` and `ap_structure_event` rows keep their history with `character_id` set null; owned maps are orphaned (`owner_character_id` set null). No soft-delete grace — irreversible. On success calls `signOut({ redirectTo: '/' })`, which throws a redirect (the trailing `{ ok: true }` is unreachable but satisfies the type). Returns `{ ok: false, error }` only if the delete itself fails.
 

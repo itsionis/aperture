@@ -2,6 +2,7 @@ import 'server-only';
 import { redirect } from 'next/navigation';
 import { and, eq } from 'drizzle-orm';
 import type { Session } from 'next-auth';
+import type { MapLayoutConfig } from '@/types';
 import { auth } from '@/lib/auth';
 import { db } from '@/db/client';
 import { apCharacter, apUser } from '@/db/schema';
@@ -87,6 +88,19 @@ export async function getConnectionTravelAnimation(userId: number): Promise<bool
     .where(eq(apUser.id, userId));
   // Default on when the row is somehow missing — mirrors the column default.
   return row?.enabled ?? true;
+}
+
+/**
+ * The account's stored map dashboard layout (map-layout-builder), or `null` when
+ * unset — the client then falls back to `DEFAULT_MAP_LAYOUT`. One global layout
+ * per account, applied to every map.
+ */
+export async function getMapLayout(userId: number): Promise<MapLayoutConfig | null> {
+  const [row] = await db
+    .select({ mapLayout: apUser.mapLayout })
+    .from(apUser)
+    .where(eq(apUser.id, userId));
+  return row?.mapLayout ?? null;
 }
 
 /**

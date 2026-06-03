@@ -17,12 +17,16 @@ import {
   type Viewport,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import type { Layout, ResponsiveLayouts } from 'react-grid-layout';
 import type {
+  Breakpoint,
   MapContextMenuTarget,
   MapEventPayload,
+  MapLayoutConfig,
   MapSettings,
   MapSystemNode,
   MapViewData,
+  PanelId,
   StructureIntel,
 } from '@/types';
 import type { HubRoute } from '@/lib/map/route';
@@ -71,8 +75,16 @@ import { StructureModule } from '@/components/sidebar/StructureModule';
 import type { StructureFormValues } from '@/components/sidebar/StructureFormDialog';
 import { InspectorModule, type SelectionRef } from '@/components/sidebar/InspectorModule';
 import { SignatureModule } from '@/components/sidebar/SignatureModule';
-import { Info, Plus, Settings, Trash2 } from 'lucide-react';
+import { Info, LayoutDashboard, Plus, RotateCcw, Settings, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Menu,
+  MenuCheckboxItem,
+  MenuContent,
+  MenuItem,
+  MenuSeparator,
+  MenuTrigger,
+} from '@/components/ui/menu';
 import { MapInfoDialog } from '@/components/dialogs/MapInfoDialog';
 import { MapSettingsDialog } from '@/components/dialogs/MapSettingsDialog';
 import { AddSystemDialog } from './AddSystemDialog';
@@ -85,6 +97,32 @@ import { MapUnderglowBridge } from './MapUnderglowBridge';
 import { SystemNode, type SystemNodeData } from './SystemNode';
 import { MapContextMenu } from './MapContextMenu';
 import { SubchainDeleteDialog } from './SubchainDeleteDialog';
+import { MapLayoutGrid } from './layout/MapLayoutGrid';
+import { MapPanel } from './layout/MapPanel';
+import { DEFAULT_MAP_LAYOUT, PANELS, ensurePanelsPlaced } from '@/lib/map/layout/panels';
+import { setMapLayoutAction } from '@/app/(app)/actions/account';
+
+// Debounce window for persisting layout edits (drag/resize/hide) to the server.
+const LAYOUT_SAVE_DEBOUNCE_MS = 600;
+
+// Union two breakpoints' layout arrays by item `i` (incoming wins). RGL only
+// reports geometry for panels currently rendered, so a hidden panel's slot (and
+// any panel not yet placed) is preserved from the previous state rather than
+// dropped from the breakpoint on the next change.
+function mergeLayouts(
+  prev: Record<Breakpoint, Layout>,
+  incoming: ResponsiveLayouts<Breakpoint>,
+): Record<Breakpoint, Layout> {
+  const next = { ...prev };
+  for (const bp of Object.keys(incoming) as Breakpoint[]) {
+    const incomingBp = incoming[bp];
+    if (!incomingBp) continue;
+    const incomingIds = new Set(incomingBp.map((item) => item.i));
+    const kept = prev[bp].filter((item) => !incomingIds.has(item.i));
+    next[bp] = [...incomingBp, ...kept];
+  }
+  return next;
+}
 
 const nodeTypes = { system: SystemNode };
 const edgeTypes = { connection: ConnectionEdge };
@@ -99,6 +137,7 @@ export function MapCanvas({
   travelAnimation,
   canConfigureTagging,
   viewerCharacterIds,
+  mapLayout,
 }: {
   data: MapViewData;
   routes: Record<number, HubRoute[]>;
@@ -111,6 +150,11 @@ export function MapCanvas({
   canConfigureTagging: boolean;
   /** Viewer's account character ids — matched against presence for the CTRL+V fast-paste location check. */
   viewerCharacterIds: number[];
+  /**
+   * Saved per-account dashboard layout (map-layout-builder), or `null` to use
+   * `DEFAULT_MAP_LAYOUT`. Accepted now but unused until the grid lands (Stage 3).
+   */
+  mapLayout?: MapLayoutConfig | null;
 }) {
   const [selected, setSelected] = useState<SelectionRef | null>(null);
   // The multi-select set; `selected` (above) remains the primary anchor that
@@ -174,7 +218,79 @@ export function MapCanvas({
     }
   });
 
-  const [canvasHeight, setCanvasHeight] = useState(600);
+  // ---- Free-form dashboard layout (map-layout-builder) -------------------
+  // Seeded from the saved per-account layout; `null` ⇒ the default arrangement.
+  // `ensurePanelsPlaced` auto-places any registered panel missing from a saved
+  // layout (a panel that shipped after the user last saved) — forward-compat,
+  // no data migration. A no-op for `DEFAULT_MAP_LAYOUT` (already complete).
+  const [layout, setLayout] = useState<MapLayoutConfig>(() =>
+    ensurePanelsPlaced(mapLayout ?? DEFAULT_MAP_LAYOUT),
+  );
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // RGL fires `onLayoutChange` once on mount with its normalized layout; that
+  // first call updates local state but must not persist (no spurious write per
+  // map open). Subsequent (user-driven) changes save.
+  const firstLayoutChange = useRef(true);
+
+  const saveLayout = useCallback((config: MapLayoutConfig) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      // Fire-and-forget: a layout-preference write failing is non-critical.
+      void setMapLayoutAction(config);
+    }, LAYOUT_SAVE_DEBOUNCE_MS);
+  }, []);
+
+  // Flush nothing but cancel a pending debounce on unmount.
+  useEffect(() => () => clearTimeout(saveTimer.current ?? undefined), []);
+
+  const handleLayoutChange = useCallback(
+    (_current: Layout, all: ResponsiveLayouts<Breakpoint>) => {
+      setLayout((prev) => {
+        const next: MapLayoutConfig = { ...prev, layouts: mergeLayouts(prev.layouts, all) };
+        if (!firstLayoutChange.current) saveLayout(next);
+        firstLayoutChange.current = false;
+        return next;
+      });
+    },
+    [saveLayout],
+  );
+
+  const handleHide = useCallback(
+    (id: PanelId) => {
+      setLayout((prev) => {
+        if (prev.hidden.includes(id)) return prev;
+        const next: MapLayoutConfig = { ...prev, hidden: [...prev.hidden, id] };
+        saveLayout(next);
+        return next;
+      });
+    },
+    [saveLayout],
+  );
+
+  // Panels-menu checkbox: flip a panel between hidden and visible. Re-showing a
+  // panel returns it to its preserved slot — `mergeLayouts` keeps a hidden
+  // panel's geometry, so the grid replaces it where it was, not at the bottom.
+  const handleToggleVisible = useCallback(
+    (id: PanelId) => {
+      setLayout((prev) => {
+        const hidden = prev.hidden.includes(id)
+          ? prev.hidden.filter((h) => h !== id)
+          : [...prev.hidden, id];
+        const next: MapLayoutConfig = { ...prev, hidden };
+        saveLayout(next);
+        return next;
+      });
+    },
+    [saveLayout],
+  );
+
+  // Reset to the shipped arrangement. Clone so later immutable updates can never
+  // mutate the shared `DEFAULT_MAP_LAYOUT` constant.
+  const handleResetLayout = useCallback(() => {
+    const next = structuredClone(DEFAULT_MAP_LAYOUT);
+    setLayout(next);
+    saveLayout(next);
+  }, [saveLayout]);
 
   useMapSubscription(Number(data.map.id));
   const { lastEvent } = useRealtime();
@@ -636,40 +752,6 @@ export function MapCanvas({
     [mapId],
   );
 
-  // Restore canvas height after mount — localStorage unavailable during SSR.
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem('aperture:map:canvas-height');
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR-safe one-time restore from localStorage, no external source to subscribe to
-      setCanvasHeight(raw ? parseInt(raw, 10) : Math.round(window.innerHeight * 0.7));
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const onResizeStart = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      const startY = e.clientY;
-      const startHeight = canvasHeight;
-
-      const onMouseMove = (ev: MouseEvent) => {
-        setCanvasHeight(Math.max(200, startHeight + (ev.clientY - startY)));
-      };
-
-      const onMouseUp = (ev: MouseEvent) => {
-        const h = Math.max(200, startHeight + (ev.clientY - startY));
-        localStorage.setItem('aperture:map:canvas-height', String(h));
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-      };
-
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-    },
-    [canvasHeight],
-  );
-
   const onAliasOrTagCommit = useCallback(
     (mapSystemId: string, field: 'alias' | 'tag', next: string | null) => {
       onSystemPatch(mapSystemId, { [field]: next });
@@ -806,6 +888,163 @@ export function MapCanvas({
     [selectedSystem],
   );
 
+  // Panels the user hasn't hidden, in registry order. Order is cosmetic — the
+  // grid positions by each item's `i`, not by child order.
+  const visiblePanels = PANELS.filter((p) => !layout.hidden.includes(p.id));
+
+  // The JSX for one panel's body. The canvas keeps its own positioned wrapper
+  // (overlays + menu + dialog); the rest are the existing sidebar/signature
+  // modules with unchanged props.
+  const panelContent = (id: PanelId) => {
+    switch (id) {
+      case 'canvas':
+        return (
+          <div
+            ref={flowWrapperRef}
+            className="relative h-full overflow-hidden rounded-lg ring-1 ring-foreground/10"
+          >
+            {selectedSystemIds.size > 1 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={removeSelectedSystems}
+                className="nodrag nopan absolute right-2 top-2 z-10"
+              >
+                <Trash2 />
+                Remove {selectedSystemIds.size}
+              </Button>
+            )}
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              onNodeClick={onNodeClick}
+              onEdgeClick={onEdgeClick}
+              onPaneClick={onPaneClick}
+              onNodeContextMenu={onNodeContextMenu}
+              onEdgeContextMenu={onEdgeContextMenu}
+              onPaneContextMenu={onPaneContextMenu}
+              onSelectionStart={onSelectionStart}
+              onSelectionEnd={onSelectionEnd}
+              onSelectionChange={onSelectionChange}
+              onInit={(inst) => {
+                flowInstance.current = inst;
+              }}
+              onNodesChange={onNodesChange}
+              onNodeDragStop={onNodeDragStop}
+              onConnect={onConnect}
+              snapToGrid
+              snapGrid={[GRID_SIZE, GRID_SIZE]}
+              nodesDraggable
+              nodesConnectable
+              selectionKeyCode={['Control', 'Meta']}
+              multiSelectionKeyCode={['Control', 'Meta']}
+              selectionMode={SelectionMode.Partial}
+              deleteKeyCode={null}
+              connectionMode={ConnectionMode.Loose}
+              edgesFocusable
+              colorMode="dark"
+              fitView={initialViewport === null}
+              defaultViewport={initialViewport ?? undefined}
+              zoomOnScroll={false}
+              preventScrolling={false}
+              onMoveEnd={onMoveEnd}
+              proOptions={{ hideAttribution: true }}
+            >
+              <Background />
+              <Controls showInteractive={false} />
+            </ReactFlow>
+            <MapContextMenu
+              target={contextMenu}
+              onClose={() => setContextMenu(null)}
+              systems={viewData.systems}
+              connections={viewData.connections}
+              homeMapSystemId={viewData.map.homeMapSystemId}
+              onSystemPatch={onSystemPatch}
+              onSystemRemove={onSystemRemove}
+              onConnectionPatch={onConnectionPatch}
+              onConnectionDelete={onConnectionDelete}
+              onAddSystemAt={onAddSystemAt}
+              onDeleteSubchain={onDeleteSubchain}
+              onDeleteSubchainPick={onDeleteSubchainPick}
+            />
+            <SubchainDeleteDialog
+              open={subchainPreview !== null}
+              headName={subchainPreview?.headName ?? ''}
+              systemNames={subchainPreview?.names ?? []}
+              onConfirm={onConfirmSubchain}
+              onCancel={onCancelSubchain}
+            />
+          </div>
+        );
+      case 'signatures':
+        return (
+          <SignatureModule
+            mapId={mapId}
+            system={selectedSystem}
+            signatures={viewData.signatures}
+            connections={viewData.connections}
+            systems={viewData.systems}
+            onCreate={onSignatureCreate}
+            onPatch={onSignaturePatch}
+            onDelete={onSignatureDelete}
+            onBulkPaste={onBulkPaste}
+          />
+        );
+      case 'inspector':
+        return (
+          <InspectorModule
+            selected={selected}
+            viewData={viewData}
+            onSystemPatch={onSystemPatch}
+            onSystemRemove={onSystemRemove}
+            onConnectionPatch={onConnectionPatch}
+            onConnectionDelete={onConnectionDelete}
+          />
+        );
+      case 'route':
+        return (
+          <RouteModule
+            system={selectedSystem}
+            routes={selectedSystem ? routes[selectedSystem.systemId] : undefined}
+          />
+        );
+      case 'intel':
+        return (
+          <IntelModule
+            system={selectedSystem}
+            intel={selectedSystem ? intel[selectedSystem.systemId] : undefined}
+          />
+        );
+      case 'structure':
+        return (
+          <StructureModule
+            system={selectedSystem}
+            structures={selectedSystem ? (structures[selectedSystem.systemId] ?? []) : []}
+            onCreate={onStructureCreate}
+            onPatch={onStructurePatch}
+            onDelete={onStructureDelete}
+          />
+        );
+      case 'killStats':
+        return (
+          <KillStatsModule
+            system={selectedSystem}
+            stats={selectedSystem ? stats[selectedSystem.systemId] : undefined}
+          />
+        );
+      case 'systemGraph':
+        return <SystemGraphModule system={selectedSystem} />;
+      case 'systemKillboard':
+        return <SystemKillboardModule system={selectedSystem} />;
+      case 'tags':
+        return <TagsModule viewData={viewData} selectedSystemId={selectedSystem?.id ?? null} />;
+      case 'thera':
+        return <TheraModule mapId={mapId} viewData={viewData} onBulkPaste={onBulkPaste} />;
+    }
+  };
+
   return (
     <MapPresenceProvider initial={data.presence}>
       <MapTravelProvider>
@@ -821,158 +1060,62 @@ export function MapCanvas({
           viewerCharacterIds={viewerCharacterIds}
           onBulkPaste={onBulkPaste}
         />
-        <div className="flex gap-4">
-          <div className="flex min-w-0 flex-1 flex-col gap-4">
-            <div className="flex items-center justify-end gap-1">
-              <Button variant="ghost" size="sm" onClick={() => setAddSystemOpen(true)}>
-                <Plus />
-                Add system
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setMapInfoOpen(true)}>
-                <Info />
-                Map info
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(true)}>
-                <Settings />
-                Settings
-              </Button>
-            </div>
-            <div
-              ref={flowWrapperRef}
-              style={{ height: canvasHeight }}
-              className="relative overflow-hidden rounded-lg ring-1 ring-foreground/10"
-            >
-              {selectedSystemIds.size > 1 && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={removeSelectedSystems}
-                  className="nodrag nopan absolute right-2 top-2 z-10"
-                >
-                  <Trash2 />
-                  Remove {selectedSystemIds.size}
-                </Button>
-              )}
-              <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                nodeTypes={nodeTypes}
-                edgeTypes={edgeTypes}
-                onNodeClick={onNodeClick}
-                onEdgeClick={onEdgeClick}
-                onPaneClick={onPaneClick}
-                onNodeContextMenu={onNodeContextMenu}
-                onEdgeContextMenu={onEdgeContextMenu}
-                onPaneContextMenu={onPaneContextMenu}
-                onSelectionStart={onSelectionStart}
-                onSelectionEnd={onSelectionEnd}
-                onSelectionChange={onSelectionChange}
-                onInit={(inst) => {
-                  flowInstance.current = inst;
-                }}
-                onNodesChange={onNodesChange}
-                onNodeDragStop={onNodeDragStop}
-                onConnect={onConnect}
-                snapToGrid
-                snapGrid={[GRID_SIZE, GRID_SIZE]}
-                nodesDraggable
-                nodesConnectable
-                selectionKeyCode={['Control', 'Meta']}
-                multiSelectionKeyCode={['Control', 'Meta']}
-                selectionMode={SelectionMode.Partial}
-                deleteKeyCode={null}
-                connectionMode={ConnectionMode.Loose}
-                edgesFocusable
-                colorMode="dark"
-                fitView={initialViewport === null}
-                defaultViewport={initialViewport ?? undefined}
-                zoomOnScroll={false}
-                preventScrolling={false}
-                onMoveEnd={onMoveEnd}
-                proOptions={{ hideAttribution: true }}
-              >
-                <Background />
-                <Controls showInteractive={false} />
-              </ReactFlow>
-              <MapContextMenu
-                target={contextMenu}
-                onClose={() => setContextMenu(null)}
-                systems={viewData.systems}
-                connections={viewData.connections}
-                homeMapSystemId={viewData.map.homeMapSystemId}
-                onSystemPatch={onSystemPatch}
-                onSystemRemove={onSystemRemove}
-                onConnectionPatch={onConnectionPatch}
-                onConnectionDelete={onConnectionDelete}
-                onAddSystemAt={onAddSystemAt}
-                onDeleteSubchain={onDeleteSubchain}
-                onDeleteSubchainPick={onDeleteSubchainPick}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-end gap-1">
+            <Menu>
+              <MenuTrigger
+                render={
+                  <Button variant="ghost" size="sm">
+                    <LayoutDashboard />
+                    Panels
+                  </Button>
+                }
               />
-              <SubchainDeleteDialog
-                open={subchainPreview !== null}
-                headName={subchainPreview?.headName ?? ''}
-                systemNames={subchainPreview?.names ?? []}
-                onConfirm={onConfirmSubchain}
-                onCancel={onCancelSubchain}
-              />
-            </div>
-
-            {/* Drag handle — resizes the map canvas; sigs panel stays at full height below */}
-            <div
-              role="separator"
-              aria-orientation="horizontal"
-              className="-my-2 flex h-4 cursor-ns-resize items-center justify-center"
-              onMouseDown={onResizeStart}
-            >
-              <div className="h-1 w-10 rounded-full bg-border transition-colors hover:bg-foreground/30" />
-            </div>
-
-            <SignatureModule
-              mapId={mapId}
-              system={selectedSystem}
-              signatures={viewData.signatures}
-              connections={viewData.connections}
-              systems={viewData.systems}
-              onCreate={onSignatureCreate}
-              onPatch={onSignaturePatch}
-              onDelete={onSignatureDelete}
-              onBulkPaste={onBulkPaste}
-            />
+              <MenuContent>
+                {PANELS.map((p) => (
+                  <MenuCheckboxItem
+                    key={p.id}
+                    checked={!layout.hidden.includes(p.id)}
+                    onCheckedChange={() => handleToggleVisible(p.id)}
+                  >
+                    {p.title}
+                  </MenuCheckboxItem>
+                ))}
+                <MenuSeparator />
+                <MenuItem icon={<RotateCcw />} onClick={handleResetLayout}>
+                  Reset layout
+                </MenuItem>
+              </MenuContent>
+            </Menu>
+            <Button variant="ghost" size="sm" onClick={() => setAddSystemOpen(true)}>
+              <Plus />
+              Add system
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setMapInfoOpen(true)}>
+              <Info />
+              Map info
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(true)}>
+              <Settings />
+              Settings
+            </Button>
           </div>
-
-          <aside className="flex w-80 shrink-0 flex-col gap-4 self-start">
-            <InspectorModule
-              selected={selected}
-              viewData={viewData}
-              onSystemPatch={onSystemPatch}
-              onSystemRemove={onSystemRemove}
-              onConnectionPatch={onConnectionPatch}
-              onConnectionDelete={onConnectionDelete}
-            />
-            <RouteModule
-              system={selectedSystem}
-              routes={selectedSystem ? routes[selectedSystem.systemId] : undefined}
-            />
-            <IntelModule
-              system={selectedSystem}
-              intel={selectedSystem ? intel[selectedSystem.systemId] : undefined}
-            />
-            <StructureModule
-              system={selectedSystem}
-              structures={selectedSystem ? (structures[selectedSystem.systemId] ?? []) : []}
-              onCreate={onStructureCreate}
-              onPatch={onStructurePatch}
-              onDelete={onStructureDelete}
-            />
-            <KillStatsModule
-              system={selectedSystem}
-              stats={selectedSystem ? stats[selectedSystem.systemId] : undefined}
-            />
-            <SystemGraphModule system={selectedSystem} />
-            <SystemKillboardModule system={selectedSystem} />
-            <TagsModule viewData={viewData} selectedSystemId={selectedSystem?.id ?? null} />
-            <TheraModule mapId={mapId} viewData={viewData} onBulkPaste={onBulkPaste} />
-          </aside>
+          <MapLayoutGrid layouts={layout.layouts} onLayoutChange={handleLayoutChange}>
+            {visiblePanels.map((p) => (
+              <div key={p.id}>
+                <MapPanel
+                  id={p.id}
+                  title={p.title}
+                  onHide={handleHide}
+                  contentClassName={
+                    p.id === 'canvas' ? 'min-h-0 flex-1 overflow-hidden p-0' : undefined
+                  }
+                >
+                  {panelContent(p.id)}
+                </MapPanel>
+              </div>
+            ))}
+          </MapLayoutGrid>
         </div>
 
         <MapInfoDialog open={mapInfoOpen} onOpenChange={setMapInfoOpen} viewData={viewData} />

@@ -225,6 +225,13 @@
       "when": 1779625200000,
       "tag": "0032_connection_static",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1779626400000,
+      "tag": "0033_account_map_layout",
+      "breakpoints": true
     }
   ]
 }

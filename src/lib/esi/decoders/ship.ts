@@ -32,7 +32,9 @@ const SIMPLE_ESCAPES: Record<string, string> = {
 export function normalizeShipName(raw: string): string {
   const wrapped = PYTHON_UNICODE_REPR.exec(raw);
   if (!wrapped) return raw;
-  const body = wrapped[2];
+  // Group 2 is `[\s\S]*` — it always participates when the match succeeds, so
+  // this is never undefined; the assertion just tells `noUncheckedIndexedAccess`.
+  const body = wrapped[2]!;
   return body.replace(
     PYTHON_STRING_ESCAPE,
     (_match, longHex, shortHex, byteHex, simple) => {

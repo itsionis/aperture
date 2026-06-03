@@ -1,4 +1,7 @@
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
+// Type-only (erased at compile) — `Layout` is RGL's `readonly LayoutItem[]`. Safe to
+// pull into this server-imported barrel; no runtime client/server coupling.
+import type { Layout } from 'react-grid-layout';
 import type {
   apCharacter,
   apCharacterRole,
@@ -347,6 +350,38 @@ export type UnderglowConfig = {
   /** Duration of one pulse cycle in ms. */
   speedMs: number;
 };
+
+// Free-form map layout (map-layout-builder). The user's per-account global dashboard
+// arrangement, persisted on `ap_user.map_layout` and applied to every map they open.
+/** Every draggable card in the map dashboard grid. */
+export type PanelId =
+  | 'canvas'
+  | 'signatures'
+  | 'inspector'
+  | 'route'
+  | 'intel'
+  | 'structure'
+  | 'killStats'
+  | 'systemGraph'
+  | 'systemKillboard'
+  | 'tags'
+  | 'thera';
+
+/** Responsive breakpoint keys. Each holds an independent arrangement. */
+export type Breakpoint = 'lg' | 'md' | 'sm';
+
+/**
+ * The stored layout. `layouts[bp]` is react-grid-layout's `Layout` (a
+ * `readonly LayoutItem[]` — `{ i, x, y, w, h, minW?, minH?, … }`); each item's `i` is a
+ * `PanelId` (enforced at the Zod boundary, not the structural type). A `PanelId` present
+ * in the registry but missing from a saved breakpoint is auto-placed on load, so new
+ * panels need no data migration. `hidden` is the set the user removed from the grid.
+ */
+export interface MapLayoutConfig {
+  version: number;
+  layouts: Record<Breakpoint, Layout>;
+  hidden: PanelId[];
+}
 
 /**
  * A right-click target on the map canvas, carrying both the kind/id of what was

@@ -23,6 +23,9 @@ The account's `ap_user.main_character_id` as a string (bigint isn't JSON-safe), 
 ### getConnectionTravelAnimation(userId: number): Promise<boolean>
 The account's `ap_user.connection_travel_animation` toggle (defaults to `true` when the row is missing). Threaded through the app layout to the Account Settings toggle and to `MapCanvas`, where it gates whether jump-traversals play the moving-dot animation.
 
+### getMapLayout(userId: number): Promise<MapLayoutConfig | null>
+The account's `ap_user.map_layout` — the free-form map dashboard arrangement (map-layout-builder), or `null` when unset (the client then falls back to `DEFAULT_MAP_LAYOUT`). One global layout per account, applied to every map. Loaded in `map/[[...slug]]/page.tsx` and passed to `MapCanvas`; written by `setMapLayoutAction` (`actions/account.ts`).
+
 ### assertCharacterOwnership(characterId: bigint, userId: number): Promise<boolean>
 True iff the character belongs to `userId` **and** is `status='active'`. Single source of truth for the character-ownership authorization check; reused by `setCharacterTrackingAction` (and any future per-character account action).
 

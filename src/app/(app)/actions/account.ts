@@ -6,6 +6,7 @@ import { db } from '@/db/client';
 import { apUser } from '@/db/schema';
 import { signOut } from '@/lib/auth';
 import { assertCharacterOwnership, requireSession } from '@/lib/session';
+import { mapLayoutConfigSchema } from '@/lib/map/layout/schema';
 
 // Account self-service (Stage 17.5). Low-frequency, user-initiated state changes
 // over ap_user — Server Actions per the CLAUDE.md mutation pathways.
@@ -51,6 +52,26 @@ export async function setConnectionTravelAnimationAction(
   await db
     .update(apUser)
     .set({ connectionTravelAnimation: enabled, updatedAt: new Date() })
+    .where(eq(apUser.id, session.userId));
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}
+
+/**
+ * Persist the account's free-form map dashboard layout (map-layout-builder). One
+ * global arrangement per account, applied to every map. The payload is unknown
+ * user JSON — validated at this boundary before it reaches the column. Revalidates
+ * the `/` layout so a freshly-rendered map picks up the saved arrangement.
+ */
+export async function setMapLayoutAction(config: unknown): Promise<AccountActionResult> {
+  const session = await requireSession();
+  const parsed = mapLayoutConfigSchema.safeParse(config);
+  if (!parsed.success) {
+    return { ok: false, error: 'Invalid layout.' };
+  }
+  await db
+    .update(apUser)
+    .set({ mapLayout: parsed.data, updatedAt: new Date() })
     .where(eq(apUser.id, session.userId));
   revalidatePath('/', 'layout');
   return { ok: true };
