@@ -9,6 +9,7 @@ import { requireSession } from '@/lib/session';
 import type { InferInsertModel } from 'drizzle-orm';
 import { commitMapEvent, type ActionResult } from '@/lib/map/mutations/core';
 import type { MapEventPatch, MapEventPayload } from '@/lib/realtime/protocol';
+import { applyHomeStaticExemption } from '@/lib/tagging/exemption';
 import { canCreateMap, isMapOwnerOrAdmin, requireMapRight } from '@/lib/auth/rights';
 
 /**
@@ -45,6 +46,7 @@ const updateMapSettingsSchema = z.object({
   // Stage 17.10 auto-tagging (owner/admin-gated; see the action body).
   tagScheme: z.enum(tagScheme.enumValues).optional(),
   homeMapSystemId: z.string().regex(/^\d+$/, 'Invalid system id.').nullable().optional(),
+  exemptHomeStaticFromTag: z.boolean().optional(),
 });
 
 export type CreateMapInput = z.input<typeof createMapSchema>;
@@ -179,7 +181,8 @@ export async function updateMapSettingsAction(
 
   // Auto-tagging config (scheme + Home) is owner/admin-only — strictly tighter
   // than the corp-grantable `map_update` that gates the rest of the dialog.
-  const touchesTagging = 'tagScheme' in patch || 'homeMapSystemId' in patch;
+  const touchesTagging =
+    'tagScheme' in patch || 'homeMapSystemId' in patch || 'exemptHomeStaticFromTag' in patch;
   if (touchesTagging && !(await isMapOwnerOrAdmin(guard.characterId, id))) {
     return { ok: false, error: 'Only the map owner or an admin can change auto-tagging.' };
   }
@@ -203,6 +206,8 @@ export async function updateMapSettingsAction(
         set.trackAbyssalJumps = out.trackAbyssalJumps = patch.trackAbyssalJumps;
       if ('logActivity' in patch) set.logActivity = out.logActivity = patch.logActivity;
       if ('tagScheme' in patch) set.tagScheme = patch.tagScheme;
+      if ('exemptHomeStaticFromTag' in patch)
+        set.exemptHomeStaticFromTag = patch.exemptHomeStaticFromTag;
       if ('homeMapSystemId' in patch) {
         if (patch.homeMapSystemId != null) {
           const homeId = BigInt(patch.homeMapSystemId);
@@ -232,6 +237,18 @@ export async function updateMapSettingsAction(
       return out;
     },
   });
+
+  // A tagging-config change can move the Home static target — reconcile the ABC
+  // exemption as separate `system.update` events (after the settings commit, so
+  // the reconcile reads the new config). No-op for non-ABC maps; failures here
+  // must never fail the settings save.
+  if (result.ok && touchesTagging) {
+    try {
+      await applyHomeStaticExemption(id, guard.characterId);
+    } catch (err) {
+      console.warn('home-static exemption reconcile failed (map=%s):', id.toString(), err);
+    }
+  }
 
   if (result.ok) revalidatePath('/maps');
   return result;

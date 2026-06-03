@@ -21,7 +21,7 @@ Returns the amber/gold accent (`#fbbf24`) used to mark the map's designated Home
 Returns `{ stroke, strokeWidth, strokeDasharray? }`. Scope sets the base colour; wormholes are recoloured by `massStatus` (fresh/reduced/critical). `eolStage` dashes the line — `critical` (1h) dashes tighter (`2 3`) than `eol` (4h, `6 4`) to read as more urgent; `jumpMassClass === 's'` thins the stroke (frigate/small holes).
 
 ### connectionBadges(edge: MapConnectionEdge): string[]
-Short labels for a connection: jump-mass class (`S`/`M`/`L`/`XL`), then `EOL` (eol stage) or `EOL 1h` (critical stage), `ROLL`, `PRES`.
+Short labels for a connection: `STATIC` (user-designated static), jump-mass class (`S`/`M`/`L`/`XL`), then `EOL` (eol stage) or `EOL 1h` (critical stage), `ROLL`, `PRES`.
 
 ### Notes
 - Colours mirror legacy semantics, not exact legacy hex. Kept out of Tailwind tokens because they're consumed inside SVG/inline styles.

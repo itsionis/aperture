@@ -136,6 +136,7 @@ describe('formatHistoryMessage', () => {
       eolStage: 'none',
       preserveMass: false,
       isRolling: false,
+      isStatic: false,
       eolAt: null,
       createdAt: '2026-05-27T12:00:00.000Z',
     };

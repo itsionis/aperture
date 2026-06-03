@@ -108,7 +108,11 @@ function TaggingPanel({
 }) {
   const [scheme, setScheme] = useState<MapSettings['tagScheme']>(settings.tagScheme);
   const [homeMapSystemId, setHomeMapSystemId] = useState(settings.homeMapSystemId ?? '');
+  const [exemptHomeStatic, setExemptHomeStatic] = useState(settings.exemptHomeStaticFromTag);
   const [pending, startTransition] = useTransition();
+
+  // The exemption only applies under ABC and needs a Home to anchor the static.
+  const canExempt = scheme === 'abc' && homeMapSystemId !== '';
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -117,6 +121,7 @@ function TaggingPanel({
         mapId,
         tagScheme: scheme,
         homeMapSystemId: homeMapSystemId === '' ? null : homeMapSystemId,
+        exemptHomeStaticFromTag: exemptHomeStatic,
       });
       if (result.ok) toast.success('Tagging updated.');
       else toast.error(result.error);
@@ -173,6 +178,23 @@ function TaggingPanel({
           designated.
         </p>
       </div>
+
+      <label className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          className="mt-0.5 size-4 accent-primary disabled:opacity-50"
+          checked={exemptHomeStatic}
+          disabled={!canExempt}
+          onChange={(e) => setExemptHomeStatic(e.target.checked)}
+        />
+        <span className="flex flex-col">
+          <span className="text-sm font-medium">Exempt home static from auto-tag</span>
+          <span className="text-xs text-muted-foreground">
+            ABC only. Leave the system on the far side of Home’s static connection untagged — its
+            letter is freed for reclaim. Mark the connection as Static via its right-click menu.
+          </span>
+        </span>
+      </label>
 
       <div className="flex justify-end">
         <Button type="submit" disabled={pending}>

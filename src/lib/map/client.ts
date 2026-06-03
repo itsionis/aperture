@@ -67,6 +67,7 @@ export type CreateConnectionBody = {
   eolStage?: EolStage;
   preserveMass?: boolean;
   isRolling?: boolean;
+  isStatic?: boolean;
 };
 
 export type UpdateConnectionBody = {
@@ -76,6 +77,7 @@ export type UpdateConnectionBody = {
   eolStage?: EolStage;
   preserveMass?: boolean;
   isRolling?: boolean;
+  isStatic?: boolean;
 };
 
 export type CreateSignatureBody = {

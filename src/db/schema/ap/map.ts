@@ -48,6 +48,10 @@ export const apMap = pgTable('ap_map', {
   // cycle. Mirrors the `ap_user.main_character_id` precedent (migration 0018).
   tagScheme: tagScheme('tag_scheme').notNull().default('none'),
   homeMapSystemId: bigint('home_map_system_id', { mode: 'bigint' }),
+  // When true (ABC scheme only), the system reached by the Home system's static
+  // connection (`ap_map_connection.is_static`) is left untagged — its letter is
+  // freed for reclaim. Reconciled in `reconcileHomeStaticExemption`.
+  exemptHomeStaticFromTag: boolean('exempt_home_static_from_tag').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   // NULL = active; non-null = soft-deleted, awaiting hard purge.

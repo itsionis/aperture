@@ -21,7 +21,7 @@
 A Base UI menu popup anchored to the cursor point, with per-kind items:
 
 - **system** — `Status ▸` radio submenu (`SYSTEM_STATUSES`); `Set rally` / `Clear rally` toggle; `Locked` checkbox; separator; destructive `Remove from map`.
-- **connection** — `Mass ▸` (`WH_MASSES`), `Jump mass ▸` (`unknown` + `WH_JUMP_MASSES`), `Type ▸` (`CONNECTION_SCOPES`), `EOL ▸` (`EOL_STAGES` via `EOL_STAGE_LABELS`) radio submenus; `Preserve mass` / `Rolling` checkboxes; separator; destructive `Delete connection`.
+- **connection** — `Mass ▸` (`WH_MASSES`), `Jump mass ▸` (`unknown` + `WH_JUMP_MASSES`), `Type ▸` (`CONNECTION_SCOPES`), `EOL ▸` (`EOL_STAGES` via `EOL_STAGE_LABELS`) radio submenus; `Preserve mass` / `Rolling` / `Static` checkboxes (`Static` designates the link as the source system's static — drives the ABC home-static exemption); separator; destructive `Delete connection`.
 - **pane** — single `Add system` item.
 
 If the target id no longer resolves (realtime removed it), a single disabled "… not found" item is shown.

@@ -77,6 +77,8 @@ export type MapConnectionEdge = {
   eolStage: EolStage;
   preserveMass: boolean;
   isRolling: boolean;
+  /** User-designated as the source system's static (free manual flag). */
+  isStatic: boolean;
   /** When the current `eol_stage` was entered (ISO). Null when `eolStage === 'none'`. */
   eolAt: string | null;
   /** ISO timestamp the row was inserted. Drives the pre-EOL "expires in X" hint. */
@@ -175,6 +177,8 @@ export type MapSettings = {
   tagScheme: TagScheme;
   /** `ap_map_system.id` of the designated Home, or null. */
   homeMapSystemId: string | null;
+  /** ABC-only: leave the Home system's static target untagged. */
+  exemptHomeStaticFromTag: boolean;
 };
 
 /**
@@ -263,6 +267,7 @@ export async function loadMapForView(
       eolStage: apMapConnection.eolStage,
       preserveMass: apMapConnection.preserveMass,
       isRolling: apMapConnection.isRolling,
+      isStatic: apMapConnection.isStatic,
       eolAt: apMapConnection.eolAt,
       createdAt: apMapConnection.createdAt,
     })
@@ -332,6 +337,7 @@ export async function loadMapForView(
       eolStage: c.eolStage,
       preserveMass: c.preserveMass,
       isRolling: c.isRolling,
+      isStatic: c.isStatic,
       eolAt: c.eolAt ? c.eolAt.toISOString() : null,
       createdAt: c.createdAt.toISOString(),
     })),
@@ -378,6 +384,7 @@ export async function loadMapSettings(
       logActivity: apMap.logActivity,
       tagScheme: apMap.tagScheme,
       homeMapSystemId: apMap.homeMapSystemId,
+      exemptHomeStaticFromTag: apMap.exemptHomeStaticFromTag,
     })
     .from(apMap)
     .where(and(eq(apMap.id, mapId), isNull(apMap.deletedAt)));

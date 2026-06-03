@@ -25,6 +25,7 @@ const createConnectionBodySchema = z.object({
   eolStage: z.enum(eolStage.enumValues).optional(),
   preserveMass: z.boolean().optional(),
   isRolling: z.boolean().optional(),
+  isStatic: z.boolean().optional(),
 });
 
 export const runtime = 'nodejs';
@@ -72,6 +73,7 @@ export async function POST(
     eolStage: parsed.data.eolStage,
     preserveMass: parsed.data.preserveMass,
     isRolling: parsed.data.isRolling,
+    isStatic: parsed.data.isStatic,
   });
 
   // Auto-tagging (Stage 17.10): on a 0121 map a new edge may root an untagged

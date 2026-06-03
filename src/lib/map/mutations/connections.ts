@@ -26,6 +26,7 @@ export type CreateConnectionInput = {
   eolStage?: EolStage;
   preserveMass?: boolean;
   isRolling?: boolean;
+  isStatic?: boolean;
 };
 
 export type DeleteConnectionInput = {
@@ -44,6 +45,7 @@ export type UpdateConnectionPatch = {
   eolStage?: EolStage;
   preserveMass?: boolean;
   isRolling?: boolean;
+  isStatic?: boolean;
 };
 
 export type UpdateConnectionInput = {
@@ -75,6 +77,7 @@ export function createConnection(
           eolStage: stage,
           preserveMass: input.preserveMass ?? false,
           isRolling: input.isRolling ?? false,
+          isStatic: input.isStatic ?? false,
           eolAt: stage !== 'none' ? new Date() : null,
         })
         .returning({
@@ -87,6 +90,7 @@ export function createConnection(
           eolStage: apMapConnection.eolStage,
           preserveMass: apMapConnection.preserveMass,
           isRolling: apMapConnection.isRolling,
+          isStatic: apMapConnection.isStatic,
           eolAt: apMapConnection.eolAt,
           createdAt: apMapConnection.createdAt,
         });
@@ -100,6 +104,7 @@ export function createConnection(
         eolStage: row!.eolStage,
         preserveMass: row!.preserveMass,
         isRolling: row!.isRolling,
+        isStatic: row!.isStatic,
         eolAt: row!.eolAt ? row!.eolAt.toISOString() : null,
         createdAt: row!.createdAt.toISOString(),
       };
@@ -152,6 +157,7 @@ export function updateConnection(
       if ('jumpMassClass' in patch) set.jumpMassClass = patch.jumpMassClass;
       if ('preserveMass' in patch) set.preserveMass = patch.preserveMass;
       if ('isRolling' in patch) set.isRolling = patch.isRolling;
+      if ('isStatic' in patch) set.isStatic = patch.isStatic;
 
       let nextEolAt: Date | null | undefined;
       if ('eolStage' in patch && patch.eolStage !== undefined) {
@@ -191,6 +197,7 @@ export function updateConnection(
       if ('jumpMassClass' in patch) out.jumpMassClass = patch.jumpMassClass;
       if ('preserveMass' in patch) out.preserveMass = patch.preserveMass;
       if ('isRolling' in patch) out.isRolling = patch.isRolling;
+      if ('isStatic' in patch) out.isStatic = patch.isStatic;
       if ('eolStage' in patch && patch.eolStage !== undefined) {
         out.eolStage = patch.eolStage;
         out.eolAt = nextEolAt ? nextEolAt.toISOString() : null;

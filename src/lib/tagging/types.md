@@ -12,10 +12,10 @@
 `{ mapSystemId: bigint; systemId: number; tag: string | null; securityClass: string | null }` — one visible system in the snapshot. `securityClass` is the `universe_system.security` label from `deriveSecurityLabel` (`C1`..`Cn` wormhole, `H`/`L`/`0.0` k-space, `A`/`P`, null). `tag` is the bare token (e.g. `B`, `121`).
 
 ### TagEdge
-`{ source: bigint; target: bigint }` — one connection, endpoints as `ap_map_system.id`. Direction-agnostic.
+`{ source: bigint; target: bigint; isStatic: boolean }` — one connection, endpoints as `ap_map_system.id`. Direction-agnostic. `isStatic` is read only by the home-static exemption reconcile (the strategies ignore it).
 
 ### TagContext
-`{ scheme: ActiveScheme; homeMapSystemId: bigint | null; systems: TagSystem[]; connections: TagEdge[] }` — a map's tag-relevant state. `systems` is visible systems only (so soft-deleted rows drop out and free their tag).
+`{ scheme: ActiveScheme; homeMapSystemId: bigint | null; exemptHomeStatic: boolean; systems: TagSystem[]; connections: TagEdge[] }` — a map's tag-relevant state. `systems` is visible systems only (so soft-deleted rows drop out and free their tag). `exemptHomeStatic` mirrors `ap_map.exempt_home_static_from_tag` (consumed only by `reconcileHomeStaticExemption`).
 
 ### AvailableTags
 Discriminated by `scheme`. `abc` → `perClass: { classLabel; next: string[] }[]`. `0121` → `perParent: { parentMapSystemId: string | null; parentLabel: string; next: string }[]`. The `TagsModule` panel view-model.

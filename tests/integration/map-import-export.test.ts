@@ -267,6 +267,7 @@ describe.skipIf(!run)('map import/export — round-trip + remap (real Postgres)'
           eolStage: 'none',
           preserveMass: false,
           isRolling: false,
+          isStatic: false,
         },
       ],
       signatures: [],

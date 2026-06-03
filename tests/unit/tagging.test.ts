@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { abcStrategy } from '@/lib/tagging/abc';
+import { abcStrategy, homeStaticExemptionChanges } from '@/lib/tagging/abc';
 import { scheme0121Strategy } from '@/lib/tagging/scheme0121';
-import type { TagContext, TagSystem } from '@/lib/tagging/types';
+import type { TagContext, TagEdge, TagSystem } from '@/lib/tagging/types';
 
 // Pure-strategy tests for the Stage 17.10 auto-tagging schemes. No db.
 
@@ -15,6 +15,7 @@ const sys = (id: number, securityClass: string | null, tag: string | null): TagS
 const abcCtx = (systems: TagSystem[]): TagContext => ({
   scheme: 'abc',
   homeMapSystemId: null,
+  exemptHomeStatic: false,
   systems,
   connections: [],
 });
@@ -72,6 +73,7 @@ const HOME = 100;
 const chainCtx = (systems: TagSystem[]): TagContext => ({
   scheme: '0121',
   homeMapSystemId: BigInt(HOME),
+  exemptHomeStatic: false,
   systems,
   connections: [],
 });
@@ -143,5 +145,87 @@ describe('0121 strategy', () => {
     expect(homeRow.next).toBe('2'); // 1 is taken
     const parentRow = out.perParent.find((r) => r.parentLabel === '1')!;
     expect(parentRow.next).toBe('11');
+  });
+});
+
+const STATIC_HOME = 100;
+const edge = (source: number, target: number, isStatic: boolean): TagEdge => ({
+  source: BigInt(source),
+  target: BigInt(target),
+  isStatic,
+});
+
+const exemptCtx = (
+  systems: TagSystem[],
+  connections: TagEdge[],
+  exemptHomeStatic: boolean,
+): TagContext => ({
+  scheme: 'abc',
+  homeMapSystemId: BigInt(STATIC_HOME),
+  exemptHomeStatic,
+  systems,
+  connections,
+});
+
+describe('ABC home-static exemption', () => {
+  // Home is k-space here so it is never itself taggable (keeps the C5 letter
+  // math about the static target / siblings only).
+  const home = sys(STATIC_HOME, 'H', null);
+
+  it('clears the tag of the Home static target and frees its letter', () => {
+    const target = sys(1, 'C5', 'A');
+    const other = sys(2, 'C5', 'B');
+    const changes = homeStaticExemptionChanges(
+      exemptCtx([home, target, other], [edge(STATIC_HOME, 1, true)], true),
+    );
+    expect(changes).toContainEqual({ mapSystemId: BigInt(1), tag: null });
+    // `other` keeps B; the freed A is not reassigned to an already-tagged system.
+    expect(changes).not.toContainEqual({ mapSystemId: BigInt(2), tag: expect.anything() });
+  });
+
+  it('matches the static regardless of edge direction', () => {
+    const target = sys(1, 'C3', 'A');
+    const changes = homeStaticExemptionChanges(
+      exemptCtx([home, target], [edge(1, STATIC_HOME, true)], true),
+    );
+    expect(changes).toEqual([{ mapSystemId: BigInt(1), tag: null }]);
+  });
+
+  it('re-tags the formerly-exempt system when the toggle is off (reclaims lowest free)', () => {
+    // target untagged (was exempt), other holds B → target reclaims A.
+    const target = sys(1, 'C5', null);
+    const other = sys(2, 'C5', 'B');
+    const changes = homeStaticExemptionChanges(
+      exemptCtx([home, target, other], [edge(STATIC_HOME, 1, true)], false),
+    );
+    expect(changes).toEqual([{ mapSystemId: BigInt(1), tag: 'A' }]);
+  });
+
+  it('re-tags when the static flag is removed even with the toggle on', () => {
+    const target = sys(1, 'C5', null);
+    const changes = homeStaticExemptionChanges(
+      exemptCtx([home, target], [edge(STATIC_HOME, 1, false)], true),
+    );
+    expect(changes).toEqual([{ mapSystemId: BigInt(1), tag: 'A' }]);
+  });
+
+  it('ignores a static that does not touch Home', () => {
+    const a = sys(1, 'C5', 'A');
+    const b = sys(2, 'C5', 'B');
+    const changes = homeStaticExemptionChanges(
+      exemptCtx([home, a, b], [edge(1, 2, true)], true),
+    );
+    expect(changes).toEqual([]);
+  });
+
+  it('does nothing for a non-ABC snapshot', () => {
+    const ctx: TagContext = {
+      scheme: '0121',
+      homeMapSystemId: BigInt(STATIC_HOME),
+      exemptHomeStatic: true,
+      systems: [home, sys(1, 'C5', '1')],
+      connections: [edge(STATIC_HOME, 1, true)],
+    };
+    expect(homeStaticExemptionChanges(ctx)).toEqual([]);
   });
 });

@@ -150,6 +150,7 @@ const connectionEdgeBody = {
   eolStage: eolStageEnum,
   preserveMass: z.boolean(),
   isRolling: z.boolean(),
+  isStatic: z.boolean(),
   eolAt: z.string().nullable(),
   createdAt: z.string(),
 };
@@ -197,6 +198,7 @@ export const mapEventPayloadSchema = z.discriminatedUnion('kind', [
     eolStage: eolStageEnum.optional(),
     preserveMass: z.boolean().optional(),
     isRolling: z.boolean().optional(),
+    isStatic: z.boolean().optional(),
     eolAt: z.string().nullable().optional(),
   }),
   z.object({ kind: z.literal('connection.delete'), eventId, id: z.string() }),

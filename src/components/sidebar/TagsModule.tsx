@@ -28,6 +28,8 @@ export function TagsModule({
       scheme,
       homeMapSystemId:
         viewData.map.homeMapSystemId === null ? null : BigInt(viewData.map.homeMapSystemId),
+      // Only consumed by the server-side reconcile; `availableTags` ignores it.
+      exemptHomeStatic: false,
       systems: viewData.systems.map((s) => ({
         mapSystemId: BigInt(s.id),
         systemId: s.systemId,
@@ -37,6 +39,7 @@ export function TagsModule({
       connections: viewData.connections.map((c) => ({
         source: BigInt(c.source),
         target: BigInt(c.target),
+        isStatic: c.isStatic,
       })),
     };
     const selected = selectedSystemId === null ? null : BigInt(selectedSystemId);

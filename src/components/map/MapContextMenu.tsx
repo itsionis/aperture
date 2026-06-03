@@ -350,6 +350,13 @@ function ConnectionItems({
         Rolling
       </MenuCheckboxItem>
 
+      <MenuCheckboxItem
+        checked={connection.isStatic}
+        onCheckedChange={(checked) => onPatch({ isStatic: checked })}
+      >
+        Static
+      </MenuCheckboxItem>
+
       <MenuSeparator />
 
       <MenuItem

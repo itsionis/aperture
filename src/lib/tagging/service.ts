@@ -8,6 +8,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/db/client';
 import { apMap, apMapConnection, apMapSystem, universeSystem } from '@/db/schema';
 import { TAG_STRATEGIES } from './registry';
+import { homeStaticExemptionChanges } from './abc';
 import type { ActiveScheme, TagContext } from './types';
 import type { Tx } from '@/lib/map/mutations/core';
 
@@ -21,7 +22,11 @@ type Executor = Tx | typeof db;
  */
 export async function loadTagContext(exec: Executor, mapId: bigint): Promise<TagContext | null> {
   const [map] = await exec
-    .select({ scheme: apMap.tagScheme, homeMapSystemId: apMap.homeMapSystemId })
+    .select({
+      scheme: apMap.tagScheme,
+      homeMapSystemId: apMap.homeMapSystemId,
+      exemptHomeStatic: apMap.exemptHomeStaticFromTag,
+    })
     .from(apMap)
     .where(eq(apMap.id, mapId));
   if (!map || map.scheme === 'none') return null;
@@ -38,11 +43,21 @@ export async function loadTagContext(exec: Executor, mapId: bigint): Promise<Tag
     .where(and(eq(apMapSystem.mapId, mapId), eq(apMapSystem.visible, true)));
 
   const connections = await exec
-    .select({ source: apMapConnection.sourceMapSystemId, target: apMapConnection.targetMapSystemId })
+    .select({
+      source: apMapConnection.sourceMapSystemId,
+      target: apMapConnection.targetMapSystemId,
+      isStatic: apMapConnection.isStatic,
+    })
     .from(apMapConnection)
     .where(eq(apMapConnection.mapId, mapId));
 
-  return { scheme: map.scheme as ActiveScheme, homeMapSystemId: map.homeMapSystemId, systems, connections };
+  return {
+    scheme: map.scheme as ActiveScheme,
+    homeMapSystemId: map.homeMapSystemId,
+    exemptHomeStatic: map.exemptHomeStatic,
+    systems,
+    connections,
+  };
 }
 
 /**
@@ -86,4 +101,19 @@ export async function assignTagOnConnect(
   const target = ctx.systems.find((s) => s.mapSystemId === targetMapSystemId);
   if (!source || !target) return null;
   return TAG_STRATEGIES[ctx.scheme].tagOnConnect(ctx, { source, target });
+}
+
+/**
+ * Reconcile the ABC home-static exemption for one map. Loads the tag snapshot
+ * and delegates to the pure `homeStaticExemptionChanges` (abc.ts). Read-only —
+ * returns the tag changes; the caller (`applyHomeStaticExemption`, exemption.ts)
+ * emits one `system.updated` event per change (one mutation = one event),
+ * mirroring `assignTagOnConnect`. Returns `[]` for 0121 / unscheme'd maps.
+ */
+export async function reconcileHomeStaticExemption(
+  mapId: bigint,
+): Promise<{ mapSystemId: bigint; tag: string | null }[]> {
+  const ctx = await loadTagContext(db, mapId);
+  if (!ctx) return [];
+  return homeStaticExemptionChanges(ctx);
 }

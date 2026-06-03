@@ -218,6 +218,13 @@
       "when": 1779624000000,
       "tag": "0031_connection_eol_stage",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1779625200000,
+      "tag": "0032_connection_static",
+      "breakpoints": true
     }
   ]
 }

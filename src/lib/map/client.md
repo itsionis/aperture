@@ -13,7 +13,7 @@ Each helper returns `ActionResult<MapEventPayload>` — same shape as the route 
 |---|---|---|
 | `UpdateSystemBody` | `updateSystemOnServer` | Mirrors `PATCH /api/map/[mapId]/systems/[systemId]` Zod schema. `rallyAt` is an ISO string. |
 | `CreateConnectionBody` | `createConnectionOnServer` | `sourceMapSystemId` / `targetMapSystemId` are `ap_map_system.id` strings (digits). |
-| `UpdateConnectionBody` | `updateConnectionOnServer` | |
+| `UpdateConnectionBody` | `updateConnectionOnServer` | Includes `isStatic` (designate as the source system's static). |
 | `CreateSignatureBody` | `createSignatureOnServer` | `mapSystemId` digits; `expiresAt` ISO string. |
 | `UpdateSignatureBody` | `updateSignatureOnServer` | `mapConnectionId` digits or null; `expiresAt` optional ISO. |
 

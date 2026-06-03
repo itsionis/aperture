@@ -3,6 +3,7 @@ import { type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/session';
 import { deleteConnection, updateConnection } from '@/lib/map/mutations/connections';
+import { applyHomeStaticExemption } from '@/lib/tagging/exemption';
 import { connectionScope, eolStage, whJumpMass, whMass } from '@/db/schema/ap/enums';
 import { parseBigInt, requireMapMutate } from '../../../utils';
 
@@ -20,6 +21,7 @@ const updateConnectionBodySchema = z.object({
   eolStage: z.enum(eolStage.enumValues).optional(),
   preserveMass: z.boolean().optional(),
   isRolling: z.boolean().optional(),
+  isStatic: z.boolean().optional(),
 });
 
 export const runtime = 'nodejs';
@@ -60,6 +62,17 @@ export async function PATCH(
     patch: parsed.data,
   });
 
+  // Toggling `isStatic` on a Home-touching link changes which system is the
+  // Home static target — reconcile the ABC exemption as separate `system.update`
+  // events. No-op for non-ABC maps. Tagging failures never fail the connection.
+  if (result.ok && parsed.data.isStatic !== undefined) {
+    try {
+      await applyHomeStaticExemption(guard.mapId, guard.characterId);
+    } catch (err) {
+      console.warn('home-static exemption reconcile failed (map=%s):', guard.mapId.toString(), err);
+    }
+  }
+
   return Response.json(result, { status: result.ok ? 200 : 400 });
 }
 
@@ -82,6 +95,16 @@ export async function DELETE(
     connectionId,
     characterId: guard.characterId,
   });
+
+  // Deleting the Home static drops the exemption → the target re-tags. Reconcile
+  // reads fresh state (the row is already gone). No-op for non-ABC maps.
+  if (result.ok) {
+    try {
+      await applyHomeStaticExemption(guard.mapId, guard.characterId);
+    } catch (err) {
+      console.warn('home-static exemption reconcile failed (map=%s):', guard.mapId.toString(), err);
+    }
+  }
 
   return Response.json(result, { status: result.ok ? 200 : 400 });
 }

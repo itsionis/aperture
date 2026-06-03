@@ -84,9 +84,10 @@ export function connectionStyle(edge: MapConnectionEdge): EdgeStyle {
   };
 }
 
-/** Short labels stacked on a connection (EOL / rolling / preserve / frigate / size). */
+/** Short labels stacked on a connection (static / EOL / rolling / preserve / frigate / size). */
 export function connectionBadges(edge: MapConnectionEdge): string[] {
   const badges: string[] = [];
+  if (edge.isStatic) badges.push('STATIC');
   if (edge.jumpMassClass) badges.push(edge.jumpMassClass.toUpperCase());
   if (edge.eolStage === 'critical') badges.push('EOL 1h');
   else if (edge.eolStage === 'eol') badges.push('EOL');

@@ -232,6 +232,7 @@ async function ensureConnection(
           eolStage: apMapConnection.eolStage,
           preserveMass: apMapConnection.preserveMass,
           isRolling: apMapConnection.isRolling,
+          isStatic: apMapConnection.isStatic,
           eolAt: apMapConnection.eolAt,
           createdAt: apMapConnection.createdAt,
         });
@@ -246,6 +247,7 @@ async function ensureConnection(
         eolStage: row!.eolStage,
         preserveMass: row!.preserveMass,
         isRolling: row!.isRolling,
+        isStatic: row!.isStatic,
         eolAt: row!.eolAt ? row!.eolAt.toISOString() : null,
         createdAt: row!.createdAt.toISOString(),
       };

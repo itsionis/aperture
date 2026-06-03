@@ -11,7 +11,7 @@ Inserts one `ap_map_connection` row between two map systems. Flag defaults: `mas
 **Parameters:**
 - `input.sourceMapSystemId` / `input.targetMapSystemId` — endpoint `ap_map_system.id`s.
 - `input.scope` — required `connection_scope` (wh|stargate|jumpbridge|abyssal).
-- `input.massStatus`, `input.jumpMassClass`, `input.eolStage`, `input.preserveMass`, `input.isRolling` — optional flag overrides.
+- `input.massStatus`, `input.jumpMassClass`, `input.eolStage`, `input.preserveMass`, `input.isRolling`, `input.isStatic` — optional flag overrides. `isStatic` designates the link as the source system's static.
 - `input.mapId`, `input.characterId` — map + audit FK.
 
 ---
@@ -25,7 +25,7 @@ Hard-deletes the `ap_map_connection` row matching `(connectionId, mapId)`; attac
 Updates connection flags; only keys present in `input.patch` change (presence via `in`, so `null`/`false` are honored). Changing `eolStage` re-stamps `eol_at = now()` whenever the stage actually changes to a non-`none` value (so `eol → critical` restarts the 1h clock at the critical observation), preserves the existing stamp on a repeat of the same stage, and clears `eol_at` to null when set back to `none`. `eol_at` crosses the wire as an ISO string (or null) in the payload. Emits `connection.update` → `{ id, ...changed }`.
 
 **Parameters:**
-- `input.patch` — `UpdateConnectionPatch`: `scope`, `massStatus`, `jumpMassClass`, `eolStage`, `preserveMass`, `isRolling` (all optional).
+- `input.patch` — `UpdateConnectionPatch`: `scope`, `massStatus`, `jumpMassClass`, `eolStage`, `preserveMass`, `isRolling`, `isStatic` (all optional). Toggling `isStatic` on a Home-touching link drives the ABC home-static exemption reconcile in the PATCH route.
 
 ---
 

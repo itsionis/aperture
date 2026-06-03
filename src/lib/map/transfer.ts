@@ -81,6 +81,8 @@ const exportConnectionSchema = z.object({
   eolStage: z.enum(eolStage.enumValues),
   preserveMass: z.boolean(),
   isRolling: z.boolean(),
+  // Optional+default so pre-0032 export files (no `isStatic`) still import.
+  isStatic: z.boolean().optional().default(false),
 });
 
 const exportSignatureSchema = z.object({
@@ -174,6 +176,7 @@ export async function buildMapExport(mapId: bigint): Promise<MapExportFile> {
       eolStage: apMapConnection.eolStage,
       preserveMass: apMapConnection.preserveMass,
       isRolling: apMapConnection.isRolling,
+      isStatic: apMapConnection.isStatic,
     })
     .from(apMapConnection)
     .where(eq(apMapConnection.mapId, mapId))
@@ -220,6 +223,7 @@ export async function buildMapExport(mapId: bigint): Promise<MapExportFile> {
       eolStage: c.eolStage,
       preserveMass: c.preserveMass,
       isRolling: c.isRolling,
+      isStatic: c.isStatic,
     })),
     signatures: signatureRows.map((r) => ({
       mapSystemId: r.mapSystemId.toString(),
@@ -328,6 +332,7 @@ export async function importMapData(args: {
                 eolStage: conn.eolStage,
                 preserveMass: conn.preserveMass,
                 isRolling: conn.isRolling,
+                isStatic: conn.isStatic,
                 eolAt: conn.eolStage !== 'none' ? new Date() : null,
               })
               .returning({
@@ -340,6 +345,7 @@ export async function importMapData(args: {
                 eolStage: apMapConnection.eolStage,
                 preserveMass: apMapConnection.preserveMass,
                 isRolling: apMapConnection.isRolling,
+                isStatic: apMapConnection.isStatic,
                 eolAt: apMapConnection.eolAt,
                 createdAt: apMapConnection.createdAt,
               });
@@ -354,6 +360,7 @@ export async function importMapData(args: {
               eolStage: row!.eolStage,
               preserveMass: row!.preserveMass,
               isRolling: row!.isRolling,
+              isStatic: row!.isStatic,
               eolAt: row!.eolAt ? row!.eolAt.toISOString() : null,
               createdAt: row!.createdAt.toISOString(),
             };

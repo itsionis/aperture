@@ -23,6 +23,8 @@ export interface TagSystem {
 export interface TagEdge {
   source: bigint;
   target: bigint;
+  /** User-designated as the source system's static. Read only by the home-static exemption. */
+  isStatic: boolean;
 }
 
 /** A read-only snapshot of one map's tag-relevant state. Visible systems + their connections. */
@@ -30,6 +32,8 @@ export interface TagContext {
   scheme: ActiveScheme;
   /** The map's designated Home (`ap_map.home_map_system_id`), the 0121 root. */
   homeMapSystemId: bigint | null;
+  /** ABC-only: leave the Home system's static target untagged (`ap_map.exempt_home_static_from_tag`). */
+  exemptHomeStatic: boolean;
   systems: TagSystem[];
   connections: TagEdge[];
 }

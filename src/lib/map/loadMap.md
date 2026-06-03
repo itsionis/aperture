@@ -32,12 +32,12 @@ Stage 16.2. Maps an admin / manager can act on, **including soft-deleted rows** 
 
 ### Types
 - `MapSystemNode` — a visible system flattened with its universe metadata + statics. `statics` prefers `universe_wormhole.target_class` labels (e.g. `["C3","C5"]`) and falls back to the wormhole catalog name when the target class is null. `rallyAt` is an ISO string when a rally point is active, otherwise null.
-- `MapConnectionEdge` — a connection with scope/mass/EOL/flag fields; endpoints are `ap_map_system.id` strings. `eolAt` (ISO or null) and `createdAt` (ISO) flow through so the canvas can compute the EOL countdown.
+- `MapConnectionEdge` — a connection with scope/mass/EOL/flag fields; endpoints are `ap_map_system.id` strings. `isStatic` is the user-designated "source system's static" flag (free manual toggle). `eolAt` (ISO or null) and `createdAt` (ISO) flow through so the canvas can compute the EOL countdown.
 - `MapSignature` — a scan signature inside a placed system. `groupKey` is one of the seven scanner-level keys (or null). `typeId` is non-null only when `groupKey === 'wormhole'` and points at a `universe_type` row also present in `universe_wormhole`; `wormholeCode` is the LEFT JOIN of `universe_wormhole.name` for display ("B274", "K162", …). `name` carries the user-typed site name for cosmic sigs, or a mirror of the wormhole code for wormhole sigs. `expiresAt`, `createdAt`, and `updatedAt` are ISO strings.
 - `MapPresenceEntry` — one online tracked pilot: `{ characterId, characterName, systemId, shipTypeId, shipTypeName, locationAt }`. `systemId` is the EVE solar-system id; `locationAt` is ISO.
 - `MapViewData` — `{ map, systems, connections, signatures, presence }`, the page's full payload. `map` carries `tagScheme` + `homeMapSystemId` (Stage 17.10) so the Tags panel knows the active scheme at load time (auto-tagging config propagates on next load, not via realtime).
 - `MapListItem` — a map row for the user-facing list.
-- `MapSettings` — editable map metadata + behaviour toggles for the settings dialog; `scope`/`type` are immutable post-create (shown read-only). Stage 17.10 adds `tagScheme` + `homeMapSystemId` (owner/admin-gated on save).
+- `MapSettings` — editable map metadata + behaviour toggles for the settings dialog; `scope`/`type` are immutable post-create (shown read-only). Stage 17.10 adds `tagScheme` + `homeMapSystemId` (owner/admin-gated on save); `exemptHomeStaticFromTag` opts the map into leaving the Home static target untagged (ABC only).
 - `AdminMapListItem` — a map row for `/admin/maps`: includes owner FKs (`ownerCharacterId`/`ownerCorporationId`/`ownerAllianceId` as nullable strings), `createdAt`/`updatedAt`/`deletedAt` ISO strings, and the same identity fields as `MapListItem`.
 
 These are re-exported from `src/types/index.ts`.
