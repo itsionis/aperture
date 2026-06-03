@@ -114,18 +114,22 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
         {data.locked && <Lock className="size-3 text-muted-foreground" />}
       </div>
 
-      {(isWormhole || data.effect) && (
-        <div className="flex items-center gap-1 border-t border-foreground/10 px-2 py-0.5 text-[10px] text-muted-foreground">
-          {data.effect && <span className="capitalize">{data.effect}</span>}
-          {data.statics.length > 0 && (
-            <span className="flex items-center gap-1">
-              {data.statics.map((cls, i) => (
-                <span key={i} className="font-bold" style={{ color: systemClassColor(cls) }}>{cls}</span>
-              ))}
-            </span>
-          )}
-        </div>
-      )}
+      <div className="flex items-center gap-1 border-t border-foreground/10 px-2 py-0.5 text-[10px] text-muted-foreground">
+        {isWormhole ? (
+          <>
+            {data.effect && <span className="capitalize">{data.effect}</span>}
+            {data.statics.length > 0 && (
+              <span className="flex items-center gap-1">
+                {data.statics.map((cls, i) => (
+                  <span key={i} className="font-bold" style={{ color: systemClassColor(cls) }}>{cls}</span>
+                ))}
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="truncate">{data.regionName}</span>
+        )}
+      </div>
     </div>
   );
 }
