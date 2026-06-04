@@ -10,6 +10,12 @@ The six W-space anomaly effects (Magnetar, Red Giant, Pulsar, Wolf-Rayet Star, C
 
 Each `SystemEffect` is `{ key, name, classes: { classId, bonuses: { effect, value }[] }[] }`. `classes` holds one entry per class the effect occurs in (C1–C6 plus the relevant Drifter/shattered class), ascending by id.
 
+### systemEffectName(key: SystemEffectKey): string
+Display name for an effect key — e.g. `wolfRayet` → `"Wolf-Rayet Star"`. Falls back to the raw key if unknown.
+
+### systemEffectBonuses(key: SystemEffectKey, classId: number): SystemEffectBonus[]
+The effect's bonuses resolved to a specific system class. Resolves the class→strength tier directly off the per-strength table, so it covers every class an effect can occur in (including shattered/Drifter holes not enumerated in `SYSTEM_EFFECTS[].classes`). Returns `[]` for an unknown key or a class with no tier (e.g. Thera, `C12`). Used by `SystemNode`'s effect indicator.
+
 ### EFFECT_CLASS_LABELS: Record<number, string>
 Display labels for the class ids an effect can carry — `1→'C1'` … `6→'C6'`, plus shattered/Drifter (`13→'C13 (Shattered)'`, `14→'C14 (Sentinel)'`, `15→'C15 (Barbican)'`, `16→'C16 (Vidette)'`, `17→'C17 (Conflux)'`, `18→'C18 (Redoubt)'`).
 

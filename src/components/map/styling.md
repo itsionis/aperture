@@ -11,6 +11,9 @@ Maps a `universe_system.security` or `universe_wormhole.target_class` label to a
 - `C1`–`C6` progress from sky-blue → cyan → emerald → amber → orange → orangy-red.
 - Unknown/null → grey `#6b7280`.
 
+### systemEffectColor(key: SystemEffectKey): string
+Swatch colour for a W-space anomaly effect, carried over from legacy Pathfinder's `$wh-color-*` palette: magnetar→pink `#e06fdf`, redGiant→red `#d9534f`, pulsar→blue `#428bca`, wolfRayet→orange `#e28a0d`, cataclysmic→light-yellow `#ffffbb`, blackHole→black `#000000`. Used by `SystemNode`'s effect indicator square.
+
 ### systemStatusColor(status): string
 Maps a `system_status` enum value to a hex colour (unknown→grey, friendly→blue, occupied→amber, hostile→red, empty→green, unscanned→purple).
 

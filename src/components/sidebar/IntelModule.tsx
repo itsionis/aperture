@@ -4,6 +4,8 @@ import { ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { MapSystemNode } from '@/lib/map/loadMap';
 import type { SystemIntelSummary } from '@/lib/map/intel';
+import { systemEffectName, type SystemEffectKey } from '@/lib/eve/systemEffects';
+import { systemEffectColor } from '@/components/map/styling';
 
 export function IntelModule({
   system,
@@ -46,7 +48,14 @@ function SystemMeta({ system }: { system: MapSystemNode }) {
       {system.effect ? (
         <>
           <dt className="text-muted-foreground">Effect</dt>
-          <dd>{system.effect}</dd>
+          <dd className="flex items-center gap-1.5">
+            <span
+              className="size-2.5 rounded-xs ring-1 ring-foreground/25"
+              style={{ backgroundColor: systemEffectColor(system.effect as SystemEffectKey) }}
+              aria-hidden
+            />
+            {systemEffectName(system.effect as SystemEffectKey)}
+          </dd>
         </>
       ) : null}
     </dl>

@@ -7,7 +7,12 @@ import { Tooltip } from '@base-ui/react/tooltip';
 import { Clock, Home, Lock, Signal, Users } from 'lucide-react';
 import type { MapSystemNode } from '@/lib/map/loadMap';
 import { formatAgoFromMs } from '@/lib/map/relativeTime';
-import { homeAccentColor, systemClassColor, systemStatusColor } from './styling';
+import {
+  systemEffectBonuses,
+  systemEffectName,
+  type SystemEffectKey,
+} from '@/lib/eve/systemEffects';
+import { homeAccentColor, systemClassColor, systemEffectColor, systemStatusColor } from './styling';
 import { InlineTextEdit } from './InlineTextEdit';
 import { usePresenceForSystem } from './MapPresenceContext';
 import { useSignatureIndicator } from './MapSignatureIndicatorContext';
@@ -32,6 +37,12 @@ function securityLabel(node: MapSystemNode): string {
   if (node.security) return node.security;
   if (node.trueSec != null) return node.trueSec.toFixed(1);
   return '?';
+}
+
+/** Wormhole class number from a `C<n>` security label (e.g. "C3" → 3); null otherwise. */
+function classIdFromSecurity(security: string | null): number | null {
+  const m = security ? /^C(\d+)$/.exec(security) : null;
+  return m ? Number(m[1]) : null;
 }
 
 export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeData }) {
@@ -127,13 +138,18 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
       <div className="flex items-center gap-1 border-t border-foreground/10 px-2 py-0.5 text-[10px] text-muted-foreground">
         {isWormhole ? (
           <>
-            {data.effect && <span className="capitalize">{data.effect}</span>}
             {data.statics.length > 0 && (
               <span className="flex items-center gap-1">
                 {data.statics.map((cls, i) => (
                   <span key={i} className="font-bold" style={{ color: systemClassColor(cls) }}>{cls}</span>
                 ))}
               </span>
+            )}
+            {data.effect && (
+              <EffectIndicator
+                effect={data.effect as SystemEffectKey}
+                classId={classIdFromSecurity(data.security)}
+              />
             )}
           </>
         ) : (
@@ -226,6 +242,61 @@ function IndicatorPill({
         </Tooltip.Positioner>
       </Tooltip.Portal>
     </Tooltip.Root>
+  );
+}
+
+/**
+ * Small colour-coded square marking a W-space system's anomaly effect, pinned to
+ * the right of the footer row (`ml-auto`). Hover/focus opens a panel listing the
+ * effect's bonuses resolved to this system's class. `nodrag nopan` so the
+ * interaction never starts a canvas pan/drag.
+ */
+function EffectIndicator({
+  effect,
+  classId,
+}: {
+  effect: SystemEffectKey;
+  classId: number | null;
+}) {
+  const color = systemEffectColor(effect);
+  const name = systemEffectName(effect);
+  const bonuses = classId != null ? systemEffectBonuses(effect, classId) : [];
+
+  return (
+    <PreviewCard.Root>
+      <PreviewCard.Trigger
+        render={<button type="button" />}
+        className="nodrag nopan ml-auto size-2.5 shrink-0 rounded-xs ring-1 ring-foreground/25"
+        style={{ backgroundColor: color }}
+        aria-label={`System effect: ${name}`}
+      />
+      <PreviewCard.Portal>
+        <PreviewCard.Positioner sideOffset={4} side="bottom" align="end">
+          <PreviewCard.Popup className="nodrag nopan z-50 min-w-44 rounded-md border bg-popover px-2 py-1.5 text-xs text-popover-foreground shadow-md">
+            <div className="mb-1 flex items-center gap-1.5 font-medium">
+              <span
+                className="size-2.5 rounded-xs ring-1 ring-foreground/25"
+                style={{ backgroundColor: color }}
+                aria-hidden
+              />
+              {name}
+            </div>
+            {bonuses.length > 0 ? (
+              <ul className="space-y-0.5">
+                {bonuses.map((b) => (
+                  <li key={b.effect} className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">{b.effect}</span>
+                    <span className="font-mono tabular-nums">{b.value}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-muted-foreground">No bonuses for this class.</p>
+            )}
+          </PreviewCard.Popup>
+        </PreviewCard.Positioner>
+      </PreviewCard.Portal>
+    </PreviewCard.Root>
   );
 }
 

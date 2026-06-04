@@ -17,7 +17,9 @@ Compact sidebar card with system metadata, sovereignty, faction warfare, EVE-Sco
 - Empty selected-system state prompts the user to select a system.
 - Missing external data renders an empty state instead of blocking the map.
 - External links open in a new tab.
+- The system-meta block shows the W-space anomaly effect (when set) as a colour swatch (`systemEffectColor`) + friendly name (`systemEffectName`), not the raw `effect` key.
 
 ### Depends On
 - `SystemIntelSummary` - server-computed view model from `src/lib/map/intel.ts`.
+- `@/lib/eve/systemEffects` (`systemEffectName`, `SystemEffectKey`), `@/components/map/styling` (`systemEffectColor`).
 - `lucide-react` - external-link icon.

@@ -1,4 +1,5 @@
 import type { MapConnectionEdge, MapSystemNode } from '@/lib/map/loadMap';
+import type { SystemEffectKey } from '@/lib/eve/systemEffects';
 
 // Legacy visual fidelity for the read-only map. Pathfinder encodes status and
 // connection state purely as colour/stroke; we mirror the semantics (not exact
@@ -47,6 +48,22 @@ const HOME_ACCENT = '#fbbf24'; // amber/gold
 /** Accent colour for the designated Home system's ring and header icon. */
 export function homeAccentColor(): string {
   return HOME_ACCENT;
+}
+
+// W-space anomaly-effect swatch colours, carried over from legacy Pathfinder's
+// `$wh-color-*` palette so the node indicator reads the same as the old app.
+const SYSTEM_EFFECT_COLORS: Record<SystemEffectKey, string> = {
+  magnetar: '#e06fdf',    // pink
+  redGiant: '#d9534f',    // red
+  pulsar: '#428bca',      // blue
+  wolfRayet: '#e28a0d',   // orange
+  cataclysmic: '#ffffbb', // yellow (lighter)
+  blackHole: '#000000',   // black
+};
+
+/** Swatch colour for a W-space system effect. */
+export function systemEffectColor(key: SystemEffectKey): string {
+  return SYSTEM_EFFECT_COLORS[key];
 }
 
 const MASS_COLORS: Record<MapConnectionEdge['massStatus'], string> = {

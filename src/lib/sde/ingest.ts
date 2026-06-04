@@ -24,6 +24,7 @@ import {
   universeWormhole,
 } from '@/db/schema';
 import { deriveSecurityLabel, roundSecurity } from './security';
+import { SYSTEM_EFFECT_BY_ID } from '@/lib/eve/systemEffectAssignments';
 
 /**
  * Pinned Tranquility SDE build. CCP reorganizes the SDE periodically, so
@@ -337,7 +338,8 @@ async function ingestSystems(
       trueSec: securityStatus == null ? null : roundSecurity(securityStatus),
       securityStatus,
       securityClass: en(s.securityClass as Loc),
-      effect: null,
+      // SDE has no wormhole effect; layer it in from the vendored assignment map.
+      effect: SYSTEM_EFFECT_BY_ID[sysId] ?? null,
       x: num(pos.x),
       y: num(pos.y),
       z: num(pos.z),

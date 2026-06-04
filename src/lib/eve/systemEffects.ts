@@ -357,3 +357,20 @@ export const SYSTEM_EFFECTS: SystemEffect[] = EFFECT_DEFS.map((def) => ({
     bonuses: def.table[strengthForClassId(classId)] ?? [],
   })),
 }));
+
+const EFFECT_BY_KEY = new Map(EFFECT_DEFS.map((def) => [def.key, def] as const));
+
+/** Display name for an effect key (e.g. `wolfRayet` → "Wolf-Rayet Star"). */
+export function systemEffectName(key: SystemEffectKey): string {
+  return EFFECT_BY_KEY.get(key)?.name ?? key;
+}
+
+/**
+ * Bonuses for an effect as they apply in a given system class. Resolves the
+ * class→strength tier (legacy `getMultiplierByAreaId`) directly, so it works for
+ * every class an effect can occur in — including shattered/Drifter holes that
+ * aren't enumerated in `SYSTEM_EFFECTS[].classes`.
+ */
+export function systemEffectBonuses(key: SystemEffectKey, classId: number): SystemEffectBonus[] {
+  return EFFECT_BY_KEY.get(key)?.table[strengthForClassId(classId)] ?? [];
+}
