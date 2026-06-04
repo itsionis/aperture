@@ -219,6 +219,14 @@ function SignaturePanelBody({
 
   const metaByTypeId = useWormholeTypeMeta(mapId, system.systemId);
 
+  // Connections already claimed by a sig in this system. The sig↔connection
+  // binding is 1:1, so these are hidden from the "Leads to" dropdown (each
+  // ConnectionSelect exempts its own current value).
+  const assignedConnectionIds = useMemo(
+    () => rows.map((s) => s.mapConnectionId).filter((id): id is string => id != null),
+    [rows],
+  );
+
   /**
    * When a WH sig ends up with both a type and a linked connection, push the
    * type's inferred jump-mass band onto that connection (e.g. O477 → L). A type
@@ -348,6 +356,7 @@ function SignaturePanelBody({
                     targetClass={
                       sig.typeId == null ? null : metaByTypeId.get(sig.typeId)?.targetClass ?? null
                     }
+                    excludeIds={assignedConnectionIds}
                   />
                 </td>
                 <td className="px-1 py-0.5 text-xs text-muted-foreground">
@@ -432,6 +441,7 @@ function SignaturePanelBody({
               targetClass={
                 draftTypeId == null ? null : metaByTypeId.get(draftTypeId)?.targetClass ?? null
               }
+              excludeIds={assignedConnectionIds}
             />
           </div>
         )}

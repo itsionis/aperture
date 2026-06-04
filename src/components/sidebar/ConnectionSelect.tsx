@@ -26,6 +26,11 @@ const NONE_VALUE = '__none__';
  * connection is always kept in the list so changing the type after binding
  * doesn't blank the trigger. A null `targetClass` (e.g. K162) means "leads
  * anywhere", so no filtering is applied.
+ *
+ * `excludeIds` drops connections already claimed by another signature in the
+ * same system — the sig↔connection binding is 1:1, so a connection that's
+ * spoken for shouldn't be offered again. The current `value` is always exempt
+ * so the row keeps showing its own binding.
  */
 export function ConnectionSelect({
   system,
@@ -35,6 +40,7 @@ export function ConnectionSelect({
   onValueChange,
   disabled,
   targetClass,
+  excludeIds,
 }: {
   system: MapSystemNode;
   connections: MapConnectionEdge[];
@@ -43,6 +49,7 @@ export function ConnectionSelect({
   onValueChange: (next: string | null) => void;
   disabled?: boolean;
   targetClass?: string | null;
+  excludeIds?: string[];
 }) {
   const options = useMemo(() => {
     const systemsById = new Map(systems.map((s) => [s.id, s]));
@@ -60,8 +67,9 @@ export function ConnectionSelect({
         (x): x is { id: string; label: string; cls: string; security: string | null } =>
           x !== null,
       )
-      .filter((o) => !targetClass || o.security === targetClass || o.id === value);
-  }, [connections, systems, system.id, targetClass, value]);
+      .filter((o) => !targetClass || o.security === targetClass || o.id === value)
+      .filter((o) => o.id === value || !excludeIds?.includes(o.id));
+  }, [connections, systems, system.id, targetClass, value, excludeIds]);
 
   const items = useMemo(() => {
     const labels: Record<string, string> = { [NONE_VALUE]: '—' };
