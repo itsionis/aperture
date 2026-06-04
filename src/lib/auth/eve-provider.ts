@@ -1,5 +1,5 @@
 import type { OAuthConfig } from 'next-auth/providers';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { apertureConfig } from '../../../aperture.config';
 import { db } from '@/db/client';
@@ -73,44 +73,66 @@ export function eveProvider(): OAuthConfig<EveProfile> {
  * the new access token and writing the refresh token orphaned the character.
  * Here the DB write is awaited first; only then does the access token escape.
  *
+ * Concurrency (the recurring-401 footgun): the worker location-poll and an open
+ * browser session's Auth.js `jwt` callback both call this for the same
+ * character. EVE invalidates a refresh token the moment it's exchanged, so two
+ * *overlapping* refreshes race — the loser POSTs an already-rotated token and
+ * gets `invalid_grant`, which surfaces as a sporadic 401 / silent logout. We
+ * serialize per character with a Postgres transaction-scoped advisory lock: the
+ * read → exchange → write is atomic against other refreshers of the same
+ * character, so the next refresher always reads the committed, rotated token.
+ * The lock is per character (different characters never block each other) and
+ * is held across the token-endpoint `fetch` — that's intentional; serializing
+ * the network exchange is the whole point. The cost is one pooled connection
+ * held for the (sub-second) round-trip per concurrent character.
+ *
  * @returns the freshly-issued access token (plaintext, for immediate use).
  */
 export async function refreshAccessToken(characterId: bigint): Promise<string> {
-  const [row] = await db
-    .select({ esiRefreshToken: apCharacter.esiRefreshToken })
-    .from(apCharacter)
-    .where(eq(apCharacter.id, characterId));
-  if (!row?.esiRefreshToken) {
-    throw new Error(`No stored refresh token for character ${characterId}`);
-  }
-  const refreshToken = decryptToken(row.esiRefreshToken);
+  return db.transaction(async (tx) => {
+    // Transaction-scoped lock keyed on the character id; auto-released on
+    // commit/rollback. `hashtextextended` maps the id into the single-arg
+    // advisory-lock keyspace.
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${`esi-refresh:${characterId}`}, 0))`,
+    );
 
-  const res = await fetch(tokenUrl(), {
-    method: 'POST',
-    headers: {
-      Authorization: basicAuthHeader(),
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Host: new URL(ssoBase()).host,
-    },
-    body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken }),
+    const [row] = await tx
+      .select({ esiRefreshToken: apCharacter.esiRefreshToken })
+      .from(apCharacter)
+      .where(eq(apCharacter.id, characterId));
+    if (!row?.esiRefreshToken) {
+      throw new Error(`No stored refresh token for character ${characterId}`);
+    }
+    const refreshToken = decryptToken(row.esiRefreshToken);
+
+    const res = await fetch(tokenUrl(), {
+      method: 'POST',
+      headers: {
+        Authorization: basicAuthHeader(),
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Host: new URL(ssoBase()).host,
+      },
+      body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken }),
+    });
+    if (!res.ok) {
+      throw new Error(`EVE SSO token refresh failed: ${res.status} ${await res.text()}`);
+    }
+    const tokens = tokenResponseSchema.parse(await res.json());
+
+    const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
+    // Persist the rotated refresh token (and the new access token) BEFORE the
+    // access token is returned. Do not move the return above this await.
+    await tx
+      .update(apCharacter)
+      .set({
+        esiRefreshToken: encryptToken(tokens.refresh_token),
+        esiAccessToken: encryptToken(tokens.access_token),
+        esiAccessTokenExpires: expiresAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(apCharacter.id, characterId));
+
+    return tokens.access_token;
   });
-  if (!res.ok) {
-    throw new Error(`EVE SSO token refresh failed: ${res.status} ${await res.text()}`);
-  }
-  const tokens = tokenResponseSchema.parse(await res.json());
-
-  const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
-  // Persist the rotated refresh token (and the new access token) BEFORE the
-  // access token is returned. Do not move the return above this await.
-  await db
-    .update(apCharacter)
-    .set({
-      esiRefreshToken: encryptToken(tokens.refresh_token),
-      esiAccessToken: encryptToken(tokens.access_token),
-      esiAccessTokenExpires: expiresAt,
-      updatedAt: new Date(),
-    })
-    .where(eq(apCharacter.id, characterId));
-
-  return tokens.access_token;
 }

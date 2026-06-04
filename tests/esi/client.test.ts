@@ -21,6 +21,11 @@ vi.mock('@/lib/crypto', () => ({
   encryptToken: (s: string) => s,
 }));
 
+// The forced-refresh-on-401 path delegates to the provider; mock it so the
+// client tests stay DB-free and deterministic. Returns a fresh plaintext token.
+const { refreshMock } = vi.hoisted(() => ({ refreshMock: vi.fn() }));
+vi.mock('@/lib/auth/eve-provider', () => ({ refreshAccessToken: refreshMock }));
+
 import {
   esiCall,
   EsiBreakerOpenError,
@@ -28,6 +33,7 @@ import {
   EsiDowntimeError,
   EsiHttpError,
   EsiRateLimitError,
+  EsiTokenError,
 } from '@/lib/esi/client';
 import { statusSchema } from '@/lib/esi/decoders';
 import { __resetBreakersForTest, breakerState } from '@/lib/esi/breaker';
@@ -56,7 +62,16 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   tokenRow.value = null;
+  refreshMock.mockReset();
 });
+
+/** A character token row far enough from expiry to take the decrypt (no-refresh) path. */
+function freshTokenRow() {
+  tokenRow.value = {
+    accessToken: 'stored-token',
+    expires: new Date(NON_DOWNTIME.getTime() + 60 * 60 * 1000),
+  };
+}
 
 describe('routes resolver', () => {
   it('resolves an operationId to method + path from swagger', () => {
@@ -182,5 +197,65 @@ describe('esiCall — character auth', () => {
     await expect(
       esiCall('getCharacterLocation', { schema: locationSchema, pathParams: { character_id: 1 } }),
     ).rejects.toThrow(/requires a characterId/);
+  });
+});
+
+describe('esiCall — 401 force-refresh + retry', () => {
+  const ONLINE_OP = 'get_characters_character_id_online';
+
+  async function callOnline() {
+    const { characterOnlineSchema } = await import('@/lib/esi/decoders');
+    return esiCall('getCharacterOnline', {
+      schema: characterOnlineSchema,
+      characterId: 90000001n,
+      pathParams: { character_id: 90000001 },
+    });
+  }
+
+  it('refreshes the token and retries once, succeeding on the second request', async () => {
+    freshTokenRow();
+    refreshMock.mockResolvedValue('fresh-token');
+    let n = 0;
+    const fetchMock = vi.fn<(url: string | URL, init?: RequestInit) => Promise<Response>>(
+      async () => {
+        n += 1;
+        return n === 1
+          ? new Response('{"error":"token is expired"}', { status: 401 })
+          : new Response(JSON.stringify({ online: true }), { status: 200 });
+      },
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await callOnline();
+    expect(result.online).toBe(true);
+    expect(refreshMock).toHaveBeenCalledOnce();
+    // The retry must carry the freshly-rotated token, not the stale one.
+    expect((fetchMock.mock.calls[1]![1]!.headers as Record<string, string>).Authorization).toBe(
+      'Bearer fresh-token',
+    );
+    // A 401 is a token problem — it must not pollute the endpoint breaker.
+    expect(breakerState(ONLINE_OP)).toBe('closed');
+  });
+
+  it('throws EsiHttpError(401) — not EsiTokenError — when a refreshed token still 401s', async () => {
+    freshTokenRow();
+    refreshMock.mockResolvedValue('fresh-token');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 401 })));
+
+    const err = await callOnline().catch((e) => e);
+    expect(err).toBeInstanceOf(EsiHttpError);
+    expect((err as EsiHttpError).status).toBe(401);
+    expect(refreshMock).toHaveBeenCalledOnce();
+    expect(breakerState(ONLINE_OP)).toBe('closed'); // breaker untouched
+  });
+
+  it('surfaces EsiTokenError when the forced refresh itself fails (dead refresh token)', async () => {
+    freshTokenRow();
+    refreshMock.mockRejectedValue(new Error('EVE SSO token refresh failed: 400'));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 401 })));
+
+    const err = await callOnline().catch((e) => e);
+    expect(err).toBeInstanceOf(EsiTokenError);
+    expect(breakerState(ONLINE_OP)).toBe('closed');
   });
 });

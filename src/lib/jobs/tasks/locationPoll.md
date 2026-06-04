@@ -31,8 +31,8 @@ Returns `PollNotes` with whichever subset of `{ stopped, online, previousSystemI
 A single `try/catch` wraps steps 3–8:
 
 - **`EsiTokenError`** — token-loss: `DELETE FROM ap_map_character_tracking WHERE character_id = $1`, return `{ stopped: 'token-loss' }`. The success row carries the stop reason; no re-enqueue. Re-enabling tracking later requires the user to re-authenticate and call `startTrackingCharacter` again.
-- **`EsiBreakerOpenError` / `EsiDowntimeError`** — re-enqueue at `LOCATION_POLL_OFFLINE_MS` and re-throw so `withInstrumentation` records `success = false`. The loop survives.
-- Other errors propagate untouched; graphile-worker handles retry per its own `max_attempts`.
+- **`EsiBreakerOpenError` / `EsiDowntimeError` / `EsiHttpError` with `status === 401`** — re-enqueue at `LOCATION_POLL_OFFLINE_MS` and re-throw so `withInstrumentation` records `success = false`. The loop survives, tracking rows are kept. The 401 case reaches here only after the ESI client already force-refreshed the token and retried (see `client.md`): the refresh worked but ESI keeps rejecting the token, so it's a transient CCP-side blip — back off, don't burn graphile retries, don't delete tracking. (Contrast `EsiTokenError`, where the refresh *itself* failed → genuinely dead token → tracking deleted.)
+- Other errors propagate untouched; graphile-worker handles retry per its own `max_attempts`. The boot re-arm (`runner.md`) revives a loop that ever exhausts those attempts.
 
 ### `characterUpdate` broadcast
 The poll emits its breadcrumb via `pg_notify('map:<id>', envelope)` where the envelope is JSON of the form `{ task: 'characterUpdate', load: { characterId, characterName, online, systemId, shipTypeId, shipTypeName, shipName, locationAt } }`. `bus.ts` (Stage 12.3-tightened) discriminates by the top-level `task` field — payloads without it stay on the `mapUpdate` path. The WS server forwards the resulting `ServerToClientMessage` unchanged.

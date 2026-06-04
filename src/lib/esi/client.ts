@@ -127,14 +127,24 @@ async function resolveCharacterToken(characterId: bigint): Promise<string> {
 
   const bufferMs = apertureConfig.SSO_TOKEN_REFRESH_BUFFER_S * 1000;
   if (row.expires.getTime() - bufferMs <= Date.now()) {
-    try {
-      return await refreshAccessToken(characterId);
-    } catch (err) {
-      throw new EsiTokenError(characterId, err);
-    }
+    return forceRefreshCharacterToken(characterId);
   }
   try {
     return decryptToken(row.accessToken);
+  } catch (err) {
+    throw new EsiTokenError(characterId, err);
+  }
+}
+
+/**
+ * Unconditionally rotate the character's access token (ignoring the expiry
+ * buffer) and return it. Used as the one retry after a 401: the stored token
+ * was stale or early-invalidated. A failed rotation means the refresh token
+ * itself is dead — surfaced as `EsiTokenError` so the caller stops cleanly.
+ */
+async function forceRefreshCharacterToken(characterId: bigint): Promise<string> {
+  try {
+    return await refreshAccessToken(characterId);
   } catch (err) {
     throw new EsiTokenError(characterId, err);
   }
@@ -183,54 +193,87 @@ export async function esiCall<T>(opKey: OpKey, opts: EsiCallOptions<T>): Promise
     throw new EsiBreakerOpenError(operationId);
   }
 
-  const headers: Record<string, string> = {
-    'User-Agent': env.EVE_USER_AGENT,
-    'Accept-Encoding': 'gzip',
-    Accept: 'application/json',
-  };
-
-  if (op.auth === 'character') {
-    if (opts.characterId === undefined) {
-      throw new Error(`opKey "${opKey}" requires a characterId (auth: character)`);
-    }
-    headers.Authorization = `Bearer ${await resolveCharacterToken(opts.characterId)}`;
+  const isAuthed = op.auth === 'character';
+  if (isAuthed && opts.characterId === undefined) {
+    throw new Error(`opKey "${opKey}" requires a characterId (auth: character)`);
   }
 
   const url = buildUrl(route.path, opts.pathParams, opts.query);
-  const init: RequestInit = {
-    method: route.method.toUpperCase(),
-    headers,
-    signal: AbortSignal.timeout(apertureConfig.ESI_REQUEST_TIMEOUT_MS),
-  };
-  if (route.method === 'post' && opts.body !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    init.body = JSON.stringify(opts.body);
-  }
 
-  let res: Response;
-  try {
-    res = await fetch(url, init);
-  } catch (err) {
-    // Network error or timeout. Downtime failures are expected and must not
-    // trip the breaker.
-    if (inDowntimeWindow()) throw new EsiDowntimeError(operationId);
-    recordFailure(operationId);
-    throw new EsiHttpError(operationId, 0, err instanceof Error ? err.message : String(err));
-  }
+  // Authenticated calls get exactly one forced-refresh retry on a 401: the
+  // stored access token was stale / early-invalidated (the recurring overnight
+  // failure), so rotate it and re-issue once before giving up. A 401 is a token
+  // problem, never an endpoint-health problem, so it must NOT trip the breaker.
+  const maxAttempts = isAuthed ? 2 : 1;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const headers: Record<string, string> = {
+      'User-Agent': env.EVE_USER_AGENT,
+      'Accept-Encoding': 'gzip',
+      Accept: 'application/json',
+    };
+    if (isAuthed) {
+      const token =
+        attempt === 1
+          ? await resolveCharacterToken(opts.characterId!)
+          : await forceRefreshCharacterToken(opts.characterId!);
+      headers.Authorization = `Bearer ${token}`;
+    }
 
-  if (!res.ok) {
+    const init: RequestInit = {
+      method: route.method.toUpperCase(),
+      headers,
+      signal: AbortSignal.timeout(apertureConfig.ESI_REQUEST_TIMEOUT_MS),
+    };
+    if (route.method === 'post' && opts.body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      init.body = JSON.stringify(opts.body);
+    }
+
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch (err) {
+      // Network error or timeout. Downtime failures are expected and must not
+      // trip the breaker.
+      if (inDowntimeWindow()) throw new EsiDowntimeError(operationId);
+      recordFailure(operationId);
+      throw new EsiHttpError(operationId, 0, err instanceof Error ? err.message : String(err));
+    }
+
+    if (res.ok) {
+      recordSuccess(operationId);
+      const json = await res.json();
+      const parsed = opts.schema.safeParse(json);
+      if (!parsed.success) {
+        throw new EsiDecodeError(operationId, parsed.error);
+      }
+      return parsed.data;
+    }
+
+    // A 401 on an authenticated call is a stale/invalid token, not a sick
+    // endpoint — refresh once and retry, and keep it off the breaker.
+    if (isAuthed && res.status === 401) {
+      const body = await res.text();
+      // TEMP (recurring-401 diagnosis — remove after one capture): surface the
+      // exact CCP reason so we can tell a revoked `invalid_token` from an
+      // expired / early-invalidated access token.
+      console.warn(
+        `[esi] 401 on ${operationId} for character ${opts.characterId} ` +
+          `(attempt ${attempt}/${maxAttempts}): ${body}`,
+      );
+      if (attempt < maxAttempts) continue; // force-refresh + retry once
+      // Refresh succeeded but ESI still rejects the fresh token → treat as a
+      // transient outage (the poll backs off and survives) rather than a dead
+      // token (which would delete tracking). The endpoint breaker stays clean.
+      throw new EsiHttpError(operationId, 401, body);
+    }
+
     assertErrorBudget(operationId, res.headers);
     if (inDowntimeWindow()) throw new EsiDowntimeError(operationId);
     recordFailure(operationId);
     throw new EsiHttpError(operationId, res.status, await res.text());
   }
 
-  recordSuccess(operationId);
-
-  const json = await res.json();
-  const parsed = opts.schema.safeParse(json);
-  if (!parsed.success) {
-    throw new EsiDecodeError(operationId, parsed.error);
-  }
-  return parsed.data;
+  // Unreachable: the loop returns on success or throws on the final attempt.
+  throw new EsiTokenError(opts.characterId!);
 }

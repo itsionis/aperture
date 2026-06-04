@@ -7,6 +7,7 @@ import {
   esiCall,
   EsiBreakerOpenError,
   EsiDowntimeError,
+  EsiHttpError,
   EsiTokenError,
 } from '@/lib/esi/client';
 import {
@@ -251,7 +252,15 @@ async function poll(payload: LocationPollPayload, helpers: JobHelpers): Promise<
         .where(eq(apMapCharacterTracking.characterId, characterId));
       return { stopped: 'token-loss' };
     }
-    if (err instanceof EsiBreakerOpenError || err instanceof EsiDowntimeError) {
+    if (
+      err instanceof EsiBreakerOpenError ||
+      err instanceof EsiDowntimeError ||
+      // A 401 that survived the client's force-refresh-and-retry: the refresh
+      // worked (so the token isn't dead — not `EsiTokenError`), but ESI keeps
+      // rejecting it. Almost always a CCP-side blip; back off and keep the loop
+      // (and the tracking rows) alive rather than burning graphile retries.
+      (err instanceof EsiHttpError && err.status === 401)
+    ) {
       // ESI is in trouble — back off to the offline cadence and let
       // withInstrumentation record the failure. The loop survives.
       await reenqueue(helpers, payload, apertureConfig.LOCATION_POLL_OFFLINE_MS);
