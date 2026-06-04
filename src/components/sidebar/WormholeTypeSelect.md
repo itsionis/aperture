@@ -13,10 +13,11 @@
 | disabled | boolean | no | Disables the trigger. |
 
 ### Renders
-A shadcn `Select` populated with WH codes (e.g. "A239", "K162"). Each option shows `name → targetClass` when known. The first item is a sentinel "Select type…" that maps to `null`.
+A shadcn `Select` populated with WH codes (e.g. "A239", "K162"). Each option shows `name → targetClass` when known. The first item is a sentinel "Select type…" that maps to `null`. The system's statics (`isStatic`) are pinned to the top under a "Statics" label with a pin icon, followed by a divider and the remaining types in alphabetical order.
 
 ### Behaviour & Interactions
 - On mount and whenever `mapId` / `universeSystemId` change, calls `fetchWormholeTypes` (which caches per `(mapId, universeSystemId)`).
+- Partitions options into statics-first / others, preserving the server's alphabetical order within each group.
 - Disables itself during the initial load.
 - Treats the sentinel value `__none__` as null in both directions.
 

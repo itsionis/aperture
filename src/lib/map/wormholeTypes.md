@@ -17,7 +17,9 @@ Returns the wormhole types that can appear in `systemId`, for the WH-type dropdo
 
 Each row is left-joined to its `wormholeMaxJumpMass` dogma value (resolved by name from `universe_dogma_attribute`, read through `universe_type_attribute_effective`) and tagged with the `jumpMassBand` result. If the attribute name can't be resolved, every `jumpMassClass` is `null` (no join performed).
 
-**Returns:** `WormholeTypeOption[]` — `{ typeId, name, sourceClass, targetClass, jumpMassClass }`.
+Each row is also tagged `isStatic: true` when its `type_id` is one of the system's `universe_system_static` rows, so the dropdown can pin the system's statics to the top.
+
+**Returns:** `WormholeTypeOption[]` — `{ typeId, name, sourceClass, targetClass, jumpMassClass, isStatic }`.
 
 ---
 

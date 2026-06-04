@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { Pin } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -60,6 +61,15 @@ export function WormholeTypeSelect({
     return labels;
   }, [options]);
 
+  // Pin the system's statics to the top so they're the first thing the user
+  // sees; the rest keep the server's alphabetical order.
+  const { statics, others } = useMemo(() => {
+    const statics: WormholeTypeOption[] = [];
+    const others: WormholeTypeOption[] = [];
+    for (const opt of options) (opt.isStatic ? statics : others).push(opt);
+    return { statics, others };
+  }, [options]);
+
   const stringValue = value == null ? NONE_VALUE : String(value);
 
   return (
@@ -77,7 +87,21 @@ export function WormholeTypeSelect({
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={NONE_VALUE}>{loading ? 'Loading…' : 'Select type…'}</SelectItem>
-        {options.map((opt) => (
+        {statics.length > 0 && (
+          <>
+            <div className="px-2 pt-1.5 pb-0.5 text-[11px] font-medium uppercase text-muted-foreground">
+              Statics
+            </div>
+            {statics.map((opt) => (
+              <SelectItem key={opt.typeId} value={String(opt.typeId)}>
+                {opt.name}
+                {opt.targetClass ? ` → ${opt.targetClass}` : ''}
+              </SelectItem>
+            ))}
+            {others.length > 0 && <div className="my-1 h-px bg-border" />}
+          </>
+        )}
+        {others.map((opt) => (
           <SelectItem key={opt.typeId} value={String(opt.typeId)}>
             {opt.name}
             {opt.targetClass ? ` → ${opt.targetClass}` : ''}

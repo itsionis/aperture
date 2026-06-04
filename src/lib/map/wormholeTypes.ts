@@ -56,6 +56,8 @@ export type WormholeTypeOption = {
   targetClass: string | null;
   /** Inferred per-jump size band from `wormholeMaxJumpMass`; null = unknown (e.g. K162). */
   jumpMassClass: WhJumpMass | null;
+  /** True when this type is one of the host system's statics (anoik.is). */
+  isStatic: boolean;
 };
 
 export type StaticMatch = {
@@ -69,7 +71,8 @@ export type StaticMatch = {
  * Wormhole types that can appear in a given system, for the WH-type dropdown.
  * Returns every catalog row whose `source_class` is null (appears anywhere —
  * includes the universal `K162`) or equals the system's class label, ordered by
- * code. An unknown `systemId` yields `[]`.
+ * code. Each row is tagged `isStatic` when it's one of the system's statics, so
+ * the dropdown can pin those to the top. An unknown `systemId` yields `[]`.
  */
 export async function wormholeTypesForSystem(systemId: number): Promise<WormholeTypeOption[]> {
   const [system] = await db
@@ -77,6 +80,12 @@ export async function wormholeTypesForSystem(systemId: number): Promise<Wormhole
     .from(universeSystem)
     .where(eq(universeSystem.id, systemId));
   if (!system) return [];
+
+  const staticRows = await db
+    .select({ typeId: universeSystemStatic.typeId })
+    .from(universeSystemStatic)
+    .where(eq(universeSystemStatic.systemId, systemId));
+  const staticTypeIds = new Set(staticRows.map((r) => r.typeId));
 
   const where =
     system.security == null
@@ -106,7 +115,11 @@ export async function wormholeTypesForSystem(systemId: number): Promise<Wormhole
       .from(universeWormhole)
       .where(where)
       .orderBy(universeWormhole.name);
-    return rows.map((r) => ({ ...r, jumpMassClass: null }));
+    return rows.map((r) => ({
+      ...r,
+      jumpMassClass: null,
+      isStatic: staticTypeIds.has(r.typeId),
+    }));
   }
 
   const rows = await db
@@ -128,7 +141,11 @@ export async function wormholeTypesForSystem(systemId: number): Promise<Wormhole
     .where(where)
     .orderBy(universeWormhole.name);
 
-  return rows.map(({ jumpMass, ...r }) => ({ ...r, jumpMassClass: jumpMassBand(jumpMass) }));
+  return rows.map(({ jumpMass, ...r }) => ({
+    ...r,
+    jumpMassClass: jumpMassBand(jumpMass),
+    isStatic: staticTypeIds.has(r.typeId),
+  }));
 }
 
 /**
