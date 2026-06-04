@@ -10,13 +10,13 @@
 Pulls three ESI endpoints in parallel — `getCharacter`, `getCharacterRoles`, `getCharacterTitles` — then runs a single transaction that:
 
 1. **Upserts `ap_corporation`** for the character's corp id (FK target for role rows + rights matrix). Refreshes `alliance_id` and `last_synced_at`; leaves `name` alone (filled by the dedicated corp-name resolver).
-2. **Updates `ap_character`** — sets `corporation_id`, `alliance_id`, `authz_synced_at`. `authz_level` is set to `'admin'` iff ESI returns `apertureConfig.AUTHZ_ADMIN_ROLE` (`'Director'`), else `'member'`. Existing `'manager'` rows are preserved by an inline `CASE` so explicit admin-panel grants survive resyncs.
+2. **Updates `ap_character`** — sets `corporation_id`, `alliance_id`, `authz_synced_at`, and `authz_level` to the value returned by `resolveAuthzLevel({ characterId, isDirector })` (`src/lib/auth/resolveAuthz.ts`). The level is a deterministic cache written verbatim every pass: any Director ⇒ corp-scoped `'manager'` (instance ownership is irrelevant); global `'admin'` only from an explicit `ap_access_grant` `capability='admin'`. There is no `CASE` preserve-hack — the resolver, not a sticky column, is what keeps explicit grants across resyncs.
 3. **Reconciles `ap_character_role` rows with `source='corp_title'`** — upserts an `ap_role` per ESI title (`external_ref='<corp_id>:<title_id>'`), inserts memberships for newly held titles, deletes memberships for titles no longer returned by ESI. Built-in / external (Discord) role grants are untouched.
 
 **ESI failures (`EsiBreakerOpenError`, `EsiDowntimeError`, `EsiTokenError`, `EsiHttpError`)** cause the function to return `{ applied: false, skipped: <reason> }` *before* touching the DB. Unexpected errors propagate to the caller.
 
 **Returns** `SyncCharacterAuthzResult`:
-- `authzLevel` — `'admin' | 'manager' | 'admin'` the sync resolved to (does not reflect a preserved `'manager'` — that path returns the derived value for telemetry).
+- `authzLevel` — `'member' | 'manager' | 'admin'`, the exact value written to the row (the `resolveAuthzLevel` result; reflects explicit grants).
 - `isDirector` — whether the Director role was present.
 - `corporationId`, `allianceId` — the affiliations written.
 - `titleCount` — number of `corp_title` roles reconciled.
@@ -24,10 +24,12 @@ Pulls three ESI endpoints in parallel — `getCharacter`, `getCharacterRoles`, `
 
 ### Depends On
 - ESI: `getCharacter`, `getCharacterRoles`, `getCharacterTitles` via `esiCall`.
-- Schema: `ap_character`, `ap_corporation`, `ap_role`, `ap_character_role`.
+- `resolveAuthzLevel` (`src/lib/auth/resolveAuthz.ts`) — computes the cached `authz_level`.
+- Schema: `ap_character`, `ap_corporation`, `ap_role`, `ap_character_role`; `ap_access_grant` (read indirectly via the resolver).
 - Constants: `apertureConfig.AUTHZ_ADMIN_ROLE` (`'Director'`).
 
 ### Invariants
-- A character with neither corp roles nor titles ends up with `authz_level='member'` and no `corp_title` role rows.
-- A character whose Director role is removed in-game demotes to `member` on the next sync — admin status is **not sticky** (legacy semantics, SPEC `09-permissions-and-admin.md` lines 54–55).
+- A character with neither corp roles nor titles, and no explicit grant, ends up with `authz_level='member'` and no `corp_title` role rows.
+- A character whose Director role is removed in-game demotes from `manager` to `member` on the next sync (unless an explicit grant holds them higher) — derived authority is **not sticky**.
+- A hand-assigned `manage`/`admin` grant survives every resync because the resolver re-reads it each pass — not because the column is preserved.
 - ESI failure never leaves a partial sync — the transaction either runs to completion or no DB write happens.

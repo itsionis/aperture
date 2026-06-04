@@ -6,6 +6,8 @@ export * from './universe/views';
 export * from './universe/sovereignty';
 export * from './universe/corporation';
 export * from './ap/enums';
+export * from './ap/instance';
+export * from './ap/access_grant';
 export * from './ap/user';
 export * from './ap/character';
 export * from './ap/map';

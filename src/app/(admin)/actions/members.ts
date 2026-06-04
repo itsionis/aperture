@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/client';
-import { apCharacter } from '@/db/schema';
+import { apAccessGrant, apCharacter } from '@/db/schema';
 import { auth } from '@/lib/auth';
 import {
   adminVisibilityScope,
@@ -13,6 +13,8 @@ import {
   isManagerOrAdmin,
   type AdminVisibilityScope,
 } from '@/lib/auth/rights';
+import { addInstanceGrant } from '@/lib/auth/instanceConfig';
+import { syncCharacterAuthz } from '@/lib/auth/syncCharacterAuthz';
 
 /**
  * Stage 16.3 admin actions on `ap_character` rows: moderation
@@ -21,10 +23,18 @@ import {
  * `adminVisibilityScope`; the two authz actions further require `isAdmin`
  * (managers may moderate within their corp but cannot mint other managers).
  *
- * All five actions write directly to `ap_character` without an audit row —
- * `ap_map_event` is map-scoped (see Stage 16 plan, "What is intentionally NOT
- * in scope"). The dashboard counts in `/admin` reflect the new state on next
- * load via `revalidatePath`.
+ * Moderation actions write directly to `ap_character`. The manager toggle does
+ * NOT — per the permissions overhaul (Stage 5) it writes an `ap_access_grant`
+ * (`scope='instance', capability='manage'`) and re-resyncs the target so the
+ * recomputed `ap_character.authz_level` cache reflects it. The grant row is the
+ * source of truth; `authz_level` is just its cache (see
+ * `src/lib/auth/resolveAuthz.ts`). Super-admin (`capability='admin'`) is *not*
+ * grant-toggled here — it is a `/setup` concern.
+ *
+ * No `ap_map_event` audit row is written for any of these (`ap_map_event` is
+ * map-scoped — see Stage 16 plan, "What is intentionally NOT in scope"). The
+ * dashboard counts in `/admin` reflect the new state on next load via
+ * `revalidatePath`.
  */
 
 const characterIdSchema = z.string().regex(/^\d+$/, 'Invalid character id.');
@@ -80,7 +90,7 @@ async function gateManagerOrAdmin(): Promise<
 }
 
 async function gateAdmin(): Promise<
-  | { ok: true; scope: AdminVisibilityScope }
+  | { ok: true; scope: AdminVisibilityScope; actorId: bigint }
   | { ok: false; error: string }
 > {
   const session = await auth();
@@ -90,7 +100,21 @@ async function gateAdmin(): Promise<
   // Admin scope is always `global`; we still call the helper for the type.
   const scope = await adminVisibilityScope(session);
   if (scope === null) return { ok: false, error: 'Admin required.' };
-  return { ok: true, scope };
+  // `isAdmin` guarantees an authenticated character.
+  return { ok: true, scope, actorId: BigInt(session!.characterId!) };
+}
+
+/**
+ * Recompute and persist the target's cached `ap_character.authz_level` after a
+ * manager grant change. Delegates to the full ESI-backed `syncCharacterAuthz`
+ * so the Director-derived component is re-evaluated alongside the explicit
+ * grant — a revoke only drops the level to `member` when the character is *not*
+ * also an in-game Director. If ESI is unreachable the resync is skipped and the
+ * grant reconciles on the next periodic `character-cleanup` pass; the grant row
+ * is already the source of truth.
+ */
+async function resyncCachedLevel(characterId: bigint): Promise<void> {
+  await syncCharacterAuthz(characterId);
 }
 
 /**
@@ -200,12 +224,12 @@ export async function adminActivateCharacter(
 }
 
 /**
- * Admin-only. Promote a `'member'` row to `'manager'`. `syncCharacterAuthz`
- * preserves the `'manager'` value via its `CASE WHEN authz_level = 'manager'`
- * clause (`src/lib/auth/syncCharacterAuthz.ts`), so the grant survives every
- * subsequent ESI resync. No-op when the row is already `'manager'`; refused
- * when it is `'admin'` (admin is derived from ESI Director and not
- * grant-toggled).
+ * Admin-only. Grant a character corp-scoped `manager`. Writes an
+ * `ap_access_grant` (`scope='instance', capability='manage'`) — the durable
+ * source of truth — then re-resyncs so the recomputed `authz_level` cache
+ * reflects it. Idempotent: re-granting refreshes the existing grant row (see
+ * `addInstanceGrant`). Refused on an `admin` row — super-admin is issued and
+ * revoked from `/setup`, not toggled here.
  */
 export async function adminGrantManager(
   characterId: string,
@@ -220,25 +244,29 @@ export async function adminGrantManager(
   if (target === null) return { ok: false, error: 'Character not found.' };
 
   if (target.authzLevel === 'admin') {
-    return { ok: false, error: 'Admin status is derived from ESI; not grant-toggled.' };
-  }
-  if (target.authzLevel === 'manager') {
-    return { ok: true };
+    return { ok: false, error: 'Character is a super-admin; manage is governed from /setup.' };
   }
 
-  await db
-    .update(apCharacter)
-    .set({ authzLevel: 'manager', updatedAt: sql`now()` })
-    .where(and(eq(apCharacter.id, id), eq(apCharacter.authzLevel, 'member')));
+  await addInstanceGrant({
+    principalKind: 'character',
+    principalId: id,
+    capability: 'manage',
+    grantedByCharacterId: gate.actorId,
+  });
+  await resyncCachedLevel(id);
 
   revalidatePath('/admin/members');
   return { ok: true };
 }
 
 /**
- * Admin-only. Demote a `'manager'` row back to `'member'`. Refuses to act on
- * `'admin'` rows — those are Director-derived; revoking the Director title in
- * EVE is the only path to clearing admin.
+ * Admin-only. Revoke a character's hand-granted `manage`. Deletes the
+ * `ap_access_grant` row and re-resyncs. Note the cache may stay `manager` after
+ * a revoke: if the character also holds the in-game corp Director role,
+ * `resolveAuthzLevel` re-derives `manager` from that (revoke the Director title
+ * in EVE to clear it). Refused on an `admin` row — super-admin lives in
+ * `/setup`. Reports a clear error when there is no manage grant to revoke but
+ * the character is a Director-derived manager.
  */
 export async function adminRevokeManager(
   characterId: string,
@@ -253,16 +281,34 @@ export async function adminRevokeManager(
   if (target === null) return { ok: false, error: 'Character not found.' };
 
   if (target.authzLevel === 'admin') {
-    return { ok: false, error: 'Cannot revoke admin — derived from ESI Director.' };
+    return { ok: false, error: 'Character is a super-admin; revoke it from /setup.' };
   }
-  if (target.authzLevel === 'member') {
+
+  const deleted = await db
+    .delete(apAccessGrant)
+    .where(
+      and(
+        eq(apAccessGrant.principalKind, 'character'),
+        eq(apAccessGrant.principalId, id),
+        eq(apAccessGrant.scope, 'instance'),
+        eq(apAccessGrant.capability, 'manage'),
+      ),
+    )
+    .returning({ id: apAccessGrant.id });
+
+  if (deleted.length === 0) {
+    // No hand-grant to drop. A standing `manager` here is Director-derived and
+    // can only be cleared by removing the corp Director title in EVE.
+    if (target.authzLevel === 'manager') {
+      return {
+        ok: false,
+        error: "Manager is derived from the character's in-game Director role and cannot be revoked here.",
+      };
+    }
     return { ok: true };
   }
 
-  await db
-    .update(apCharacter)
-    .set({ authzLevel: 'member', updatedAt: sql`now()` })
-    .where(and(eq(apCharacter.id, id), eq(apCharacter.authzLevel, 'manager')));
+  await resyncCachedLevel(id);
 
   revalidatePath('/admin/members');
   return { ok: true };

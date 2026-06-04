@@ -128,3 +128,47 @@ export const structureEventKind = pgEnum('structure_event_kind', ['create', 'upd
  * `src/lib/tagging/registry.ts`. The existing two schemes are never touched.
  */
 export const tagScheme = pgEnum('tag_scheme', ['none', 'abc', '0121']);
+
+/**
+ * Permissions-overhaul. Whether the deployment admits any EVE login (`open`,
+ * the legacy behaviour) or only allowlisted principals (`restricted`, the new
+ * default). Read by the Auth.js `signIn` gate and stored on `ap_instance`.
+ */
+export const accessMode = pgEnum('access_mode', ['open', 'restricted']);
+
+/**
+ * Permissions-overhaul. What kind of entity an access grant / instance owner
+ * names. `character`, `corporation`, `alliance` carry EVE ids; `role` carries
+ * an `ap_role.id`. `ap_instance_owner` constrains itself to corp/alliance via
+ * a CHECK; `ap_access_grant` accepts all four.
+ */
+export const accessPrincipal = pgEnum('access_principal', [
+  'character',
+  'corporation',
+  'alliance',
+  'role',
+]);
+
+/**
+ * Permissions-overhaul. The reach of an `ap_access_grant` row. `instance`
+ * grants (login/admin/manage) carry NULL `map_id`; `map` grants (view/edit,
+ * reserved for the later sharing feature) carry a non-NULL `map_id`. The
+ * scope↔map_id pairing is enforced by a CHECK.
+ */
+export const accessScope = pgEnum('access_scope', ['instance', 'map']);
+
+/**
+ * Permissions-overhaul. What an access grant permits. `login`/`admin`/`manage`
+ * are instance-scoped and used now (allowlist entry / super-admin / manager
+ * hand-grant); `view`/`edit` are map-scoped and reserved for the later
+ * temporary-sharing feature — declared now so adding sharing needs no
+ * `ALTER TYPE access_capability ADD VALUE`. The capability↔scope pairing is
+ * enforced by a CHECK.
+ */
+export const accessCapability = pgEnum('access_capability', [
+  'login',
+  'admin',
+  'manage',
+  'view',
+  'edit',
+]);

@@ -25,6 +25,26 @@ Gated. Validates `name` against `onDemandJobModules()` from `src/lib/jobs/regist
 
 ---
 
+### Permissions-overhaul Stage 4 — instance access configuration
+All gated; all wrap [[instanceConfig]] and `revalidatePath('/setup')` so the server-rendered config table refreshes. EVE ids cross the client boundary as digit-strings and are parsed to `bigint` by the schemas (JS numbers can't hold a 64-bit id).
+
+### setupSetAccessMode(mode: string): Promise<ActionResult>
+Validates `mode ∈ {open, restricted}` and calls `setAccessMode`. `restricted` gates login on the allowlist; `open` admits any EVE login.
+
+### setupAddOwner(kind: string, principalId: string): Promise<ActionResult>
+Validates `kind ∈ {corporation, alliance}` + numeric id, calls `addOwner`. Owner members may always log in; ownership does not elevate `authz_level`.
+
+### setupRemoveOwner(kind: string, principalId: string): Promise<ActionResult>
+Validates + calls `removeOwner`.
+
+### setupAddGrant(args: { principalKind; principalId; capability; expiresAt; note }): Promise<ActionResult>
+Validates `principalKind ∈ {character, corporation, alliance, role}`, numeric `principalId`, `capability ∈ {login, admin, manage}`, optional `expiresAt` (`datetime-local` string; empty = permanent) and `note`, then calls `addInstanceGrant`. `login` = allowlist entry; `admin`/`manage` are read by `resolveAuthzLevel` on the next resync.
+
+### setupRemoveGrant(id: string): Promise<ActionResult>
+Validates numeric id, calls `removeGrant` (which guards `scope='instance'`).
+
+---
+
 ### Notes
 - All actions emit a `console.warn` with the client IP (best-effort from `x-forwarded-for`) and the action name. No DB audit row — CLAUDE.md forbids parallel audit tables and `ap_map_event` is map-scoped.
 - The unlock action's constant-time compare pads to the longer of the two buffers and checks the length separately so neither bypasses the other.

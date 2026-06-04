@@ -45,3 +45,13 @@ Row types are inferred and re-exported from `src/types/index.ts`.
 | View (`const`) | DB name | Notes |
 |---|---|---|
 | `universeTypeAttributeEffective` | `universe_type_attribute_effective` | `.existing()` typing handle. `COALESCE(override.value, type_attribute.value)` per `(type_id, attr_id)`. DDL in custom migration. |
+
+## `ap/instance.ts`, `ap/access_grant.ts` (permissions overhaul)
+
+Per-table detail lives in the companion `.md` beside each schema file. Migration `0034_permissions_overhaul`.
+
+| Table (`const`) | DB name | Key columns / constraints |
+|---|---|---|
+| `apInstance` | `ap_instance` | singleton `id` smallint PK (CHECK `id = 1`), `access_mode` enum default `restricted`, `updated_at` timestamptz |
+| `apInstanceOwner` | `ap_instance_owner` | `principal_kind` enum (CHECK in `corporation`/`alliance`), `principal_id` bigint, PK `(principal_kind, principal_id)` |
+| `apAccessGrant` | `ap_access_grant` | `id` bigserial PK, `principal_kind`/`principal_id`, `scope` enum, `map_id` → ap_map **CASCADE** (NULL ⇔ instance scope, CHECK), `capability` enum (CHECK paired to scope), `expires_at`, `note`, `granted_by_character_id` → ap_character **SET NULL**, `granted_at`. UNIQUE **NULLS NOT DISTINCT** `(principal_kind, principal_id, scope, map_id, capability)` |

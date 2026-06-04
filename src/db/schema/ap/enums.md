@@ -49,3 +49,15 @@
 
 ### tagScheme
 `pgEnum('tag_scheme', ['none', 'abc', '0121'])` — Stage 17.10. The auto-tagging scheme a map runs (`ap_map.tag_scheme`, default `none`). `abc` = per-WH-class sequential letters; `0121` = positional chain numbering off the Home system. Adding a third scheme is additive (one `ALTER TYPE … ADD VALUE` + a strategy module + a `registry.ts` line).
+
+### accessMode
+`pgEnum('access_mode', ['open', 'restricted'])` — Permissions-overhaul. Instance-wide login policy on `ap_instance` (default `restricted`). `open` = any EVE account may log in (legacy behaviour); `restricted` = login gated by owner membership + the `ap_access_grant` allowlist. Read by the Auth.js `signIn` gate.
+
+### accessPrincipal
+`pgEnum('access_principal', ['character', 'corporation', 'alliance', 'role'])` — Permissions-overhaul. What kind of entity an `ap_access_grant` / `ap_instance_owner` row names. `character`/`corporation`/`alliance` carry EVE ids; `role` carries an `ap_role.id`. `ap_instance_owner` is CHECK-constrained to `corporation`/`alliance`; `ap_access_grant` accepts all four.
+
+### accessScope
+`pgEnum('access_scope', ['instance', 'map'])` — Permissions-overhaul. The reach of an `ap_access_grant` row. `instance` grants carry NULL `map_id` (login/admin/manage); `map` grants carry a non-NULL `map_id` (view/edit — reserved for the sharing feature). A CHECK ties scope to `map_id` nullness.
+
+### accessCapability
+`pgEnum('access_capability', ['login', 'admin', 'manage', 'view', 'edit'])` — Permissions-overhaul. What an `ap_access_grant` row permits. `login`/`admin`/`manage` are instance-scoped and used now (allowlist entry / super-admin / manager hand-grant); `view`/`edit` are map-scoped and reserved for the later temporary-sharing feature (declared now to avoid a future `ALTER TYPE`). A CHECK pairs capability with scope.

@@ -8,8 +8,11 @@ import { encryptToken } from '@/lib/crypto';
 import { eveProvider, refreshAccessToken } from '@/lib/auth/eve-provider';
 import type { EveProfile } from '@/lib/auth/eve-provider';
 import { clearLinkCookie, readLinkUserId } from '@/lib/auth/link-cookie';
+import { isLoginAllowed } from '@/lib/auth/loginGate';
 import { syncCharacterAuthz } from '@/lib/auth/syncCharacterAuthz';
 import { AUTH_COOKIE_OPTIONS } from '@/lib/cookies';
+import { esiCall } from '@/lib/esi/client';
+import { characterPublicSchema } from '@/lib/esi/decoders';
 
 // Auth.js v5, stateless JWT sessions (no DB session store, no Redis — SPEC §7).
 // The JWT carries only the active character/user ids; ESI tokens never leave
@@ -123,6 +126,9 @@ async function resolveMainCharacter(
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [eveProvider()],
   session: { strategy: 'jwt' },
+  // A denied sign-in (the `signIn` callback below returning false) redirects
+  // here with `?error=AccessDenied` instead of the raw Auth.js error endpoint.
+  pages: { error: '/access-denied' },
   // SPEC §11 Q9 — make the cookie contract explicit at the call site rather
   // than relying on Auth.js defaults. Flags live in `@/lib/cookies` so any
   // bespoke signed cookie can read from the same constant.
@@ -132,6 +138,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     csrfToken: { options: AUTH_COOKIE_OPTIONS },
   },
   callbacks: {
+    // Permissions-overhaul Stage 3. The login gate — runs before `jwt`, so a
+    // denial issues no session/JWT and `persistLogin`/`syncCharacterAuthz`
+    // (below) never run: no `ap_character` row is created for a rejected sign-in.
+    async signIn({ profile }) {
+      if (!profile) return false;
+      const eve = profile as unknown as EveProfile;
+      const characterId = BigInt(eve.characterId);
+      // The gate needs corp/alliance, which the SSO token claims don't carry.
+      // Fetch them via the public (token-less) ESI profile endpoint.
+      let corporationId: bigint | null = null;
+      let allianceId: bigint | null = null;
+      try {
+        const pub = await esiCall('getCharacter', {
+          schema: characterPublicSchema,
+          pathParams: { character_id: characterId },
+        });
+        corporationId = BigInt(pub.corporation_id);
+        allianceId = pub.alliance_id !== undefined ? BigInt(pub.alliance_id) : null;
+      } catch (err) {
+        // ESI unreachable (downtime / breaker open / schema drift). Degrade to
+        // character-level checks: explicit character grants and the bootstrap
+        // path still admit known characters, while owner/corp/alliance-only
+        // entitlements are denied until ESI recovers. Never fail open.
+        console.warn(`[auth] login-gate affiliation fetch failed for ${characterId}:`, err);
+      }
+      return isLoginAllowed({ characterId, corporationId, allianceId });
+    },
     async jwt({ token, account, profile }) {
       // Initial sign-in: `account` carries the freshly-exchanged tokens and
       // `profile` is the verified JWT-claims object from the provider.

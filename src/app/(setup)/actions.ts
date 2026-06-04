@@ -14,6 +14,16 @@ import {
   readSetupCookie,
   setSetupCookie,
 } from '@/lib/auth/setup-cookie';
+import {
+  addInstanceGrant,
+  addOwner,
+  type GrantPrincipalKind,
+  type InstanceGrantCapability,
+  type OwnerKind,
+  removeGrant,
+  removeOwner,
+  setAccessMode,
+} from '@/lib/auth/instanceConfig';
 import { env } from '@/lib/env';
 import { onDemandJobModules } from '@/lib/jobs/registry';
 
@@ -232,5 +242,167 @@ export async function setupRunCronOnDemand(
     return { ok: true, data: await enqueueJob(parsed.data.name) };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Enqueue failed.' };
+  }
+}
+
+/**
+ * Permissions-overhaul Stage 4. Instance access configuration. These actions
+ * wrap `src/lib/auth/instanceConfig.ts` behind the same `gate()` as the rest of
+ * the console — the operator drives the allowlist with no EVE login, the
+ * bootstrap path before anyone can sign in.
+ *
+ * All EVE ids cross the client boundary as strings (JS numbers can't hold a
+ * 64-bit id); the schemas parse a digit-string to `bigint`. Every mutation
+ * `revalidatePath('/setup')` so the server-rendered config table refreshes.
+ */
+
+const eveIdSchema = z
+  .string()
+  .trim()
+  .regex(/^\d+$/, 'Must be a numeric EVE id.')
+  .transform((s) => BigInt(s));
+
+const accessModeSchema = z.enum(['open', 'restricted']);
+const ownerKindSchema = z.enum(['corporation', 'alliance']);
+const grantKindSchema = z.enum(['character', 'corporation', 'alliance', 'role']);
+const grantCapabilitySchema = z.enum(['login', 'admin', 'manage']);
+
+/** Set the instance-wide access mode (`open` admits any EVE login; `restricted` gates on the allowlist). */
+export async function setupSetAccessMode(mode: string): Promise<ActionResult> {
+  const gated = await gate();
+  if (!gated.ok) return gated;
+
+  const parsed = accessModeSchema.safeParse(mode);
+  if (!parsed.success) return { ok: false, error: 'Invalid access mode.' };
+  await logAction('set-access-mode', { mode: parsed.data });
+
+  try {
+    await setAccessMode(parsed.data);
+    revalidatePath('/setup');
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Update failed.' };
+  }
+}
+
+/** Designate an owner corporation/alliance (members may always log in; ownership does not elevate authz). */
+export async function setupAddOwner(kind: string, principalId: string): Promise<ActionResult> {
+  const gated = await gate();
+  if (!gated.ok) return gated;
+
+  const k = ownerKindSchema.safeParse(kind);
+  const id = eveIdSchema.safeParse(principalId);
+  if (!k.success) return { ok: false, error: 'Owner must be a corporation or alliance.' };
+  if (!id.success) return { ok: false, error: id.error.issues[0]!.message };
+  await logAction('add-owner', { kind: k.data, id: principalId });
+
+  try {
+    await addOwner(k.data as OwnerKind, id.data);
+    revalidatePath('/setup');
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Add failed.' };
+  }
+}
+
+/** Remove an owner corporation/alliance. */
+export async function setupRemoveOwner(kind: string, principalId: string): Promise<ActionResult> {
+  const gated = await gate();
+  if (!gated.ok) return gated;
+
+  const k = ownerKindSchema.safeParse(kind);
+  const id = eveIdSchema.safeParse(principalId);
+  if (!k.success) return { ok: false, error: 'Owner must be a corporation or alliance.' };
+  if (!id.success) return { ok: false, error: id.error.issues[0]!.message };
+  await logAction('remove-owner', { kind: k.data, id: principalId });
+
+  try {
+    await removeOwner(k.data as OwnerKind, id.data);
+    revalidatePath('/setup');
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Remove failed.' };
+  }
+}
+
+const addGrantSchema = z.object({
+  principalKind: grantKindSchema,
+  principalId: eveIdSchema,
+  capability: grantCapabilitySchema,
+  // datetime-local sends `YYYY-MM-DDTHH:mm`; empty string = permanent.
+  expiresAt: z
+    .string()
+    .trim()
+    .transform((s, ctx): Date | null => {
+      if (s === '') return null;
+      const d = new Date(s);
+      if (Number.isNaN(d.getTime())) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid expiry date.' });
+        return z.NEVER;
+      }
+      return d;
+    }),
+  note: z
+    .string()
+    .trim()
+    .max(500)
+    .transform((s) => (s === '' ? null : s)),
+});
+
+interface AddGrantArgs {
+  principalKind: string;
+  principalId: string;
+  capability: string;
+  expiresAt: string;
+  note: string;
+}
+
+/**
+ * Add an instance-scoped allowlist/admin grant. `capability='login'` is a plain
+ * allowlist entry; `admin`/`manage` are super-admin / manager hand-grants read
+ * by `resolveAuthzLevel`. A non-empty `expiresAt` time-boxes the grant.
+ */
+export async function setupAddGrant(args: AddGrantArgs): Promise<ActionResult> {
+  const gated = await gate();
+  if (!gated.ok) return gated;
+
+  const parsed = addGrantSchema.safeParse(args);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]!.message };
+  await logAction('add-grant', {
+    kind: parsed.data.principalKind,
+    id: args.principalId,
+    capability: parsed.data.capability,
+  });
+
+  try {
+    await addInstanceGrant({
+      principalKind: parsed.data.principalKind as GrantPrincipalKind,
+      principalId: parsed.data.principalId,
+      capability: parsed.data.capability as InstanceGrantCapability,
+      expiresAt: parsed.data.expiresAt,
+      note: parsed.data.note,
+    });
+    revalidatePath('/setup');
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Add failed.' };
+  }
+}
+
+/** Revoke an instance-scoped grant by its id. */
+export async function setupRemoveGrant(id: string): Promise<ActionResult> {
+  const gated = await gate();
+  if (!gated.ok) return gated;
+
+  const parsed = eveIdSchema.safeParse(id);
+  if (!parsed.success) return { ok: false, error: 'Invalid grant id.' };
+  await logAction('remove-grant', { id });
+
+  try {
+    await removeGrant(parsed.data);
+    revalidatePath('/setup');
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Remove failed.' };
   }
 }

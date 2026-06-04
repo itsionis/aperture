@@ -1,8 +1,13 @@
 import { desc, sql } from 'drizzle-orm';
 import { db } from '@/db/client';
 import { apJobRun } from '@/db/schema';
+import { getInstanceConfig } from '@/lib/auth/instanceConfig';
 import { readSetupCookie } from '@/lib/auth/setup-cookie';
 import { onDemandJobModules } from '@/lib/jobs/registry';
+import {
+  InstanceAccessPanel,
+  type SerializedInstanceConfig,
+} from '@/components/setup/InstanceAccessPanel';
 import { RunCronCard } from '@/components/setup/RunCronCard';
 import { RunCsvIngestCard } from '@/components/setup/RunCsvIngestCard';
 import { RunMigrationsCard } from '@/components/setup/RunMigrationsCard';
@@ -74,6 +79,32 @@ async function loadStatus(): Promise<StatusSummary> {
   };
 }
 
+async function loadInstanceAccess(): Promise<SerializedInstanceConfig> {
+  try {
+    const config = await getInstanceConfig();
+    return {
+      accessMode: config.accessMode,
+      updatedAt: config.updatedAt?.toISOString() ?? null,
+      owners: config.owners.map((o) => ({
+        principalKind: o.principalKind,
+        principalId: o.principalId.toString(),
+      })),
+      grants: config.grants.map((g) => ({
+        id: g.id.toString(),
+        principalKind: g.principalKind,
+        principalId: g.principalId.toString(),
+        capability: g.capability,
+        expiresAt: g.expiresAt?.toISOString() ?? null,
+        note: g.note,
+      })),
+    };
+  } catch {
+    // Tables not migrated yet on a fresh DB — show the locked-down default so
+    // the operator can run migrations first, then revisit.
+    return { accessMode: 'restricted', updatedAt: null, owners: [], grants: [] };
+  }
+}
+
 export default async function SetupPage() {
   const unlocked = await readSetupCookie();
 
@@ -93,7 +124,7 @@ export default async function SetupPage() {
     );
   }
 
-  const status = await loadStatus();
+  const [status, instanceAccess] = await Promise.all([loadStatus(), loadInstanceAccess()]);
   const knownTaskNames = onDemandJobModules()
     .map((m) => m.name)
     .sort();
@@ -126,6 +157,8 @@ export default async function SetupPage() {
         <RunSdeIngestCard />
         <RunCsvIngestCard />
       </div>
+
+      <InstanceAccessPanel config={instanceAccess} />
 
       <CronOnDemand taskNames={knownTaskNames} />
 

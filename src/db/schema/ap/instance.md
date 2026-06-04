@@ -1,0 +1,29 @@
+## instance.ts
+
+**Purpose:** Per-deployment access configuration — the singleton `ap_instance` config row and the `ap_instance_owner` ownership list.
+**File:** `src/db/schema/ap/instance.ts`
+
+---
+
+### apInstance
+`pgTable('ap_instance', …)` — singleton config row (there is exactly one):
+- `id` — `smallint` PK, pinned to `1` by CHECK `ap_instance_singleton_chk` (`id = 1`).
+- `access_mode` — `access_mode` enum, required, default `restricted`. `restricted` gates login behind owner membership + the allowlist; `open` restores legacy "any EVE account may log in".
+- `updated_at` — `timestamptz`, default `now()`.
+
+**Constraints:**
+- `ap_instance_singleton_chk` — CHECK `(id = 1)`. Forbids a second config row.
+
+Read/written via `/setup` (Stage 4) and consulted by the login gate (Stage 3).
+
+### apInstanceOwner
+`pgTable('ap_instance_owner', …)` — the corp(s)/alliance(s) that own this deployment:
+- `principal_kind` — `access_principal` enum, required, CHECK-constrained to `corporation` / `alliance`.
+- `principal_id` — `bigint`, required. EVE corporation_id or alliance_id. No FK (`ap_corporation` is a sparse cache; no alliance table exists app-wide).
+- `created_at` — `timestamptz`, default `now()`.
+
+**Constraints:**
+- `ap_instance_owner_pk` — composite PK `(principal_kind, principal_id)`.
+- `ap_instance_owner_kind_chk` — CHECK `principal_kind IN ('corporation','alliance')`. An instance is owned by an organisation, never a single character or role.
+
+**Semantics (read in later stages):** members of an owner entity are implicitly allowed to log in (no self-lockout), and a character holding the in-game Director role in an owner entity resolves to global `admin` (`resolveAuthzLevel`, Stage 2). Owner designation lives in the DB so it is reachable from the password-gated `/setup` console before anyone can log in.

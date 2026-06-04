@@ -13,6 +13,22 @@ Pathfinder mixes three orthogonal access concepts that the codebase does not alw
 
 The runtime auth gate is whether the active character is logged in at all (`AccessController`). Anything finer is enforced inside actions.
 
+> ## ⚠️ Rebuild authority — Permissions Overhaul (supersedes the model below)
+>
+> **The legacy model documented in the rest of this file is the *source* behaviour. The rebuild's authoritative access model is `docs/plans/permissions-overhaul.md`.** Where the two disagree, the overhaul wins. The three load-bearing changes:
+>
+> 1. **Restricted-by-default login (allowlist).** Login is no longer "any EVE account." `ap_instance.access_mode` (`open`|`restricted`, default `restricted`) gates an Auth.js `signIn` callback (`src/lib/auth/loginGate.ts#isLoginAllowed`). In `restricted` mode a character may sign in only if it is a member of an `ap_instance_owner` corp/alliance, or it/its corp/its alliance holds an unexpired `ap_access_grant` with `capability='login'` (or `admin`/`manage`, which imply login). A *completely* unconfigured restricted instance admits the first caller and records a bootstrap `admin` grant, so `/setup` is never a hard precondition for the first login.
+>
+> 2. **Director ⇒ corp-scoped manager, never global admin.** The legacy "in-game Director ⇒ `SUPER`/global admin" promotion is gone. `src/lib/auth/resolveAuthz.ts#resolveAuthzLevel` caches `ap_character.authz_level` as the **max** of (a) the Director derivation — *any* Director ⇒ `manager` (the legacy `CORPORATION` tier), regardless of whether their corp owns the instance — and (b) explicit unexpired instance grants (`capability='admin' ⇒ admin`, `manage ⇒ manager`). `manager` stays corp-scoped through the unchanged `adminVisibilityScope`/`mapScopeFilterFor`/`characterScopeFilterFor` in `src/lib/auth/rights.ts`. **Global `admin` is reachable only via an explicit `capability='admin'` grant — instance ownership does not elevate.** This kills the headline bug where a foreign corp's director ran the whole deployment.
+>
+> 3. **Designed for later sharing.** `ap_access_grant` is the unified grant table. `scope='instance'` rows (`login`/`admin`/`manage`) are live now. `scope='map'` rows (`view`/`edit`, with optional `expires_at`) and anonymous `ap_share_link` public links are **declared but not yet wired** — they ship with the temporary-sharing feature (`canViewMap`/`viewableMapPredicate` will then also consult unexpired map-scope grants).
+>
+> **Instance configuration** lives in the password-gated `/setup` ops console (no EVE login): set `access_mode`, designate `ap_instance_owner`, and manage the `login`/`admin`/`manage` allowlist (`src/lib/auth/instanceConfig.ts`, `src/app/(setup)/actions.ts`).
+>
+> **Test coverage** for the guarantees above: `tests/integration/authz-resolution.test.ts` (level resolution + grant precedence + expiry), `tests/integration/login-gate.test.ts` (allow/deny matrix + ESI-degrade + bootstrap), `tests/integration/permissions-scope.test.ts` (the headline: a manager is corp-scoped at the enforcement layer and cannot reach a foreign corp's maps), and the unchanged `tests/integration/permissions.test.ts` (Stage 15 per-map rights matrix).
+>
+> The legacy `pathfinder.ini [PATHFINDER.ROLES]` ID override, the `MEMBER`/`CORPORATION`/`SUPER` role rows, and "roles refresh from in-game state on every login" below describe the *source* app; the rebuild's equivalents are the `authz_level` enum + the resolver above.
+
 ## Auth principals
 
 ```

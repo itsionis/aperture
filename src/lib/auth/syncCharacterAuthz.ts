@@ -1,4 +1,4 @@
-import { and, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, notInArray } from 'drizzle-orm';
 import { apertureConfig } from '../../../aperture.config';
 import { db } from '@/db/client';
 import {
@@ -7,6 +7,7 @@ import {
   apCorporation,
   apRole,
 } from '@/db/schema';
+import { resolveAuthzLevel } from '@/lib/auth/resolveAuthz';
 import {
   esiCall,
   EsiBreakerOpenError,
@@ -26,13 +27,15 @@ import {
  * Stage 15. Reconcile one character's derived authority state against ESI in
  * a single transactional pass. Three pieces of state are touched:
  *
- *   1. `ap_character.authz_level`         — `'admin'` iff ESI returns the
- *                                            `AUTHZ_ADMIN_ROLE` ('Director')
- *                                            corp role; else `'member'`.
- *                                            Existing `'manager'` values are
- *                                            left alone (those come from
- *                                            explicit admin-panel grants and
- *                                            are never derived).
+ *   1. `ap_character.authz_level`         — recomputed via `resolveAuthzLevel`:
+ *                                            any Director ⇒ corp-scoped
+ *                                            `'manager'` (instance ownership is
+ *                                            irrelevant here); global `'admin'`
+ *                                            only from an explicit
+ *                                            `ap_access_grant` `capability='admin'`.
+ *                                            The level is a deterministic cache,
+ *                                            written verbatim every pass — no
+ *                                            preserve-hack.
  *   2. `ap_character.corporation_id` /
  *      `ap_character.alliance_id`         — refreshed from `getCharacter`.
  *                                            `ap_corporation` row upserted as
@@ -108,6 +111,10 @@ export async function syncCharacterAuthz(
   const allianceId =
     publicProfile.alliance_id !== undefined ? BigInt(publicProfile.alliance_id) : null;
 
+  // Resolve the cached level before the transaction — the grant table it reads
+  // is independent of the writes below.
+  const resolvedLevel = await resolveAuthzLevel({ characterId, isDirector });
+
   await db.transaction(async (tx) => {
     // 1. Upsert the corp row so subsequent FK targets resolve.
     await tx
@@ -129,17 +136,14 @@ export async function syncCharacterAuthz(
         },
       });
 
-    // 2. Update the character row. `authz_level` follows the Director rule
-    //    except when the existing value is `'manager'` (hand-assigned via
-    //    admin panel) — leave that alone so admin grants survive resyncs.
-    const desiredAuthz: 'admin' | 'member' = isDirector ? 'admin' : 'member';
+    // 2. Update the character row. `authz_level` is the recomputed cache from
+    //    `resolveAuthzLevel` — written verbatim, no preserve-hack.
     await tx
       .update(apCharacter)
       .set({
         corporationId,
         allianceId,
-        // CASE preserves `manager`; sets admin/member otherwise.
-        authzLevel: sql`CASE WHEN ${apCharacter.authzLevel} = 'manager' THEN 'manager'::authz_level ELSE ${desiredAuthz}::authz_level END`,
+        authzLevel: resolvedLevel,
         authzSyncedAt: new Date(),
         updatedAt: new Date(),
       })
@@ -235,7 +239,7 @@ export async function syncCharacterAuthz(
   });
 
   return {
-    authzLevel: isDirector ? 'admin' : 'member',
+    authzLevel: resolvedLevel,
     isDirector,
     corporationId,
     allianceId,

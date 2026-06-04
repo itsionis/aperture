@@ -3,11 +3,14 @@ import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
 // pull into this server-imported barrel; no runtime client/server coupling.
 import type { Layout } from 'react-grid-layout';
 import type {
+  apAccessGrant,
   apCharacter,
   apCharacterRole,
   apCorporation,
   apCorporationRight,
   apEventKind,
+  apInstance,
+  apInstanceOwner,
   apMap,
   apMapConnection,
   apMapConnectionLog,
@@ -37,6 +40,10 @@ import type {
   universeWormhole,
 } from '@/db/schema';
 import type {
+  accessCapability,
+  accessMode,
+  accessPrincipal,
+  accessScope,
   authzLevel,
   mapRight,
   mapType,
@@ -152,6 +159,15 @@ export type NewApMapRoleAccess = InferInsertModel<typeof apMapRoleAccess>;
 export type ApCorporationRight = InferSelectModel<typeof apCorporationRight>;
 export type NewApCorporationRight = InferInsertModel<typeof apCorporationRight>;
 
+export type ApInstance = InferSelectModel<typeof apInstance>;
+export type NewApInstance = InferInsertModel<typeof apInstance>;
+
+export type ApInstanceOwner = InferSelectModel<typeof apInstanceOwner>;
+export type NewApInstanceOwner = InferInsertModel<typeof apInstanceOwner>;
+
+export type ApAccessGrant = InferSelectModel<typeof apAccessGrant>;
+export type NewApAccessGrant = InferInsertModel<typeof apAccessGrant>;
+
 export type ApStructure = InferSelectModel<typeof apStructure>;
 export type NewApStructure = InferInsertModel<typeof apStructure>;
 
@@ -167,6 +183,12 @@ export type RoleSource = (typeof roleSource.enumValues)[number];
 export type SignatureGroupKey = (typeof signatureGroupKey.enumValues)[number];
 export type StructureEventKind = (typeof structureEventKind.enumValues)[number];
 export type TagScheme = (typeof tagScheme.enumValues)[number];
+
+// Permissions-overhaul enum unions.
+export type AccessMode = (typeof accessMode.enumValues)[number];
+export type AccessPrincipal = (typeof accessPrincipal.enumValues)[number];
+export type AccessScope = (typeof accessScope.enumValues)[number];
+export type AccessCapability = (typeof accessCapability.enumValues)[number];
 /** The six cosmic-signature groups (every group except `wormhole`). Their site
  * names are baked into the EVE client and have no SDE rows, so they're carried
  * as free-text `name` strings rather than a `typeId` FK. */

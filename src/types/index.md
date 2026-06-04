@@ -37,4 +37,6 @@ Stage 17.11a adds `ApMapConnectionLog` / `NewApMapConnectionLog` (the `ap_map_co
 
 The delete-subchain feature re-exports `DeleteSubchainInput`, `SubchainDeleteSummary`, and `SubchainDeleteResult` (`{ summary, payloads }`) from `src/lib/map/mutations/subchain.ts` — an N-event branch teardown matching the bulk-paste/Thera `{ summary, payloads }` shape.
 
+Permissions-overhaul adds `ApInstance` / `ApInstanceOwner` / `ApAccessGrant` row types (`+ New*`) and the enum unions `AccessMode`, `AccessPrincipal`, `AccessScope`, `AccessCapability` (from `src/db/schema/ap/enums.ts`).
+
 map-layout-builder adds the free-form map dashboard types (directly defined): `PanelId` (the 11 draggable cards), `Breakpoint` (`'lg'|'md'|'sm'`), and `MapLayoutConfig` (`{ version; layouts: Record<Breakpoint, Layout>; hidden: PanelId[] }`). `Layout` is `react-grid-layout`'s `readonly LayoutItem[]`, imported type-only (erased; safe in this server-imported barrel). Item `i` is structurally `string` — the `PanelId` constraint is enforced at the Zod boundary (`src/lib/map/layout/schema.ts`) and in `DEFAULT_MAP_LAYOUT` (`src/lib/map/layout/panels.ts`), not the structural type. Stored on `ap_user.map_layout`.
