@@ -48,10 +48,12 @@ export function SignatureGroupSelect({
       <SelectTrigger>
         <SelectValue />
       </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={NONE_VALUE}>unknown</SelectItem>
+      <SelectContent className="p-0.5">
+        <SelectItem className="py-1" value={NONE_VALUE}>
+          unknown
+        </SelectItem>
         {SIGNATURE_GROUP_CATALOG.map((g) => (
-          <SelectItem key={g.key} value={g.key}>
+          <SelectItem className="py-1" key={g.key} value={g.key}>
             {g.label}
           </SelectItem>
         ))}

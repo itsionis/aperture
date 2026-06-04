@@ -286,15 +286,15 @@ function SignaturePanelBody({
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-[11px] uppercase text-muted-foreground">
             <tr>
-              <th className="w-24 px-2 py-2 text-left">Sig</th>
-              <th className="w-32 px-3 py-2 text-left">Group</th>
-              <th className="w-56 px-3 py-2 text-left">Type</th>
-              <th className="px-3 py-2 text-left">Description</th>
-              <th className="w-44 px-3 py-2 text-left">Leads to</th>
-              <th className="w-16 px-1 py-2 text-left">TTL</th>
-              <th className="w-24 px-1 py-2 text-left">Created</th>
-              <th className="w-24 px-1 py-2 text-left">Updated</th>
-              <th className="w-10 px-1 py-2" />
+              <th className="w-24 px-2 py-1 text-left">Sig</th>
+              <th className="w-32 px-3 py-1 text-left">Group</th>
+              <th className="w-56 px-3 py-1 text-left">Type</th>
+              <th className="px-3 py-1 text-left">Description</th>
+              <th className="w-44 px-3 py-1 text-left">Leads to</th>
+              <th className="w-16 px-1 py-1 text-left">TTL</th>
+              <th className="w-24 px-1 py-1 text-left">Created</th>
+              <th className="w-24 px-1 py-1 text-left">Updated</th>
+              <th className="w-10 px-1 py-1" />
             </tr>
           </thead>
           <tbody>
@@ -307,8 +307,8 @@ function SignaturePanelBody({
             )}
             {rows.map((sig) => (
               <tr key={sig.id} className="border-t border-foreground/10 align-middle">
-                <td className="px-2 py-1.5 font-mono text-xs">{sig.sigId}</td>
-                <td className="px-1 py-1.5">
+                <td className="px-2 py-1 font-mono text-xs">{sig.sigId}</td>
+                <td className="px-1 py-0.5">
                   <SignatureGroupSelect
                     value={sig.groupKey}
                     onValueChange={(nextKey) =>
@@ -316,7 +316,7 @@ function SignaturePanelBody({
                     }
                   />
                 </td>
-                <td className="px-1 py-1.5">
+                <td className="px-1 py-0.5">
                   <TypeCell
                     mapId={mapId}
                     system={system}
@@ -325,7 +325,7 @@ function SignaturePanelBody({
                     onSyncConnectionSize={syncConnectionSize}
                   />
                 </td>
-                <td className="px-1 py-1.5">
+                <td className="px-1 py-0.5">
                   <EditableTextCell
                     value={sig.description ?? ''}
                     onCommit={(next) => onPatch(sig.id, { description: next || null })}
@@ -333,7 +333,7 @@ function SignaturePanelBody({
                     placeholder="—"
                   />
                 </td>
-                <td className="px-1 py-1.5">
+                <td className="px-1 py-0.5">
                   <ConnectionSelect
                     system={system}
                     connections={connections}
@@ -349,16 +349,16 @@ function SignaturePanelBody({
                     }
                   />
                 </td>
-                <td className="px-1 py-1.5 text-xs text-muted-foreground">
+                <td className="px-1 py-0.5 text-xs text-muted-foreground">
                   {formatRelativeIso(sig.expiresAt)}
                 </td>
-                <td className="px-1 py-1.5 text-xs text-muted-foreground">
+                <td className="px-1 py-0.5 text-xs text-muted-foreground">
                   {formatAgoIso(sig.createdAt)}
                 </td>
-                <td className="px-1 py-1.5 text-xs text-muted-foreground">
+                <td className="px-1 py-0.5 text-xs text-muted-foreground">
                   {formatAgoIso(sig.updatedAt)}
                 </td>
-                <td className="px-1 py-1.5 text-right">
+                <td className="px-1 py-0.5 text-right">
                   <Button
                     type="button"
                     variant="ghost"

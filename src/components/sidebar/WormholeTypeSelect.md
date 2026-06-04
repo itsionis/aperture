@@ -13,7 +13,7 @@
 | disabled | boolean | no | Disables the trigger. |
 
 ### Renders
-A shadcn `Select` populated with WH codes (e.g. "A239", "K162"). Each option shows `name → targetClass` when known. The first item is a sentinel "Select type…" that maps to `null`. The system's statics (`isStatic`) are pinned to the top under a "Statics" label with a pin icon, followed by a divider and the remaining types in alphabetical order.
+A shadcn `Select` populated with WH codes (e.g. "A239", "K162"). Each option uses a flex `justify-between` layout: WH name on the left, destination class on the right, rendered bold and color-coded via `systemClassColor` — the same palette the map uses for system-node statics. The closed trigger mirrors this layout (name left, color-coded class pushed to the right edge) via a `SelectValue` render function given `flex-1` so it stretches the full trigger width. The first item is a sentinel "Select type…" that maps to `null`. The system's statics (`isStatic`) are pinned to the top under a "Statics" label with a pin icon, followed by a divider and the remaining types in alphabetical order. Option rows and the popup are vertically compacted (`py-1` items, `p-0.5` content) to fit the dense Signatures module.
 
 ### Behaviour & Interactions
 - On mount and whenever `mapId` / `universeSystemId` change, calls `fetchWormholeTypes` (which caches per `(mapId, universeSystemId)`).
@@ -24,4 +24,5 @@ A shadcn `Select` populated with WH codes (e.g. "A239", "K162"). Each option sho
 ### Depends On
 - `Select*` from `@/components/ui/select`
 - `fetchWormholeTypes` from `@/lib/map/client`
+- `systemClassColor` from `@/components/map/styling` — destination-class color coding
 - `WormholeTypeOption` from `@/types`

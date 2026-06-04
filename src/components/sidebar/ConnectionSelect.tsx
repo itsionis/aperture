@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { systemClassColor } from '@/components/map/styling';
 import type { MapConnectionEdge, MapSystemNode } from '@/types';
 
 const NONE_VALUE = '__none__';
@@ -83,16 +84,44 @@ export function ConnectionSelect({
       disabled={disabled || options.length === 0}
     >
       <SelectTrigger>
-        <SelectValue />
+        <SelectValue className="min-w-0 flex-1">
+          {(val: string) => {
+            const o = val === NONE_VALUE ? undefined : options.find((x) => x.id === val);
+            if (!o) return '—';
+            return (
+              <span className="flex min-w-0 flex-1 items-center justify-between gap-4">
+                <span className="truncate">{o.label}</span>
+                {o.cls ? (
+                  <span
+                    className="shrink-0 text-xs font-bold"
+                    style={{ color: systemClassColor(o.security) }}
+                  >
+                    {o.cls}
+                  </span>
+                ) : null}
+              </span>
+            );
+          }}
+        </SelectValue>
       </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={NONE_VALUE}>—</SelectItem>
+      <SelectContent className="p-0.5">
+        <SelectItem className="py-1" value={NONE_VALUE}>
+          —
+        </SelectItem>
         {options.map((o) => (
-          <SelectItem key={o.id} value={o.id}>
+          <SelectItem className="py-1" key={o.id} value={o.id}>
             <span className="flex w-full justify-between gap-4">
               <span>{o.label}</span>
               {o.cls ? (
-                <span className="text-xs text-muted-foreground">{o.cls}</span>
+                // Color the whole class+tag label with the same palette the map
+                // uses for system-node statics, so a hole's target reads
+                // consistently in both places.
+                <span
+                  className="text-xs font-bold"
+                  style={{ color: systemClassColor(o.security) }}
+                >
+                  {o.cls}
+                </span>
               ) : null}
             </span>
           </SelectItem>

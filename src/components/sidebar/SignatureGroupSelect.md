@@ -12,7 +12,7 @@
 | disabled | boolean | no | Disables the trigger. |
 
 ### Renders
-A shadcn `Select` with eight options: an "unknown" sentinel (maps to `null`) followed by the seven entries of `SIGNATURE_GROUP_CATALOG`.
+A shadcn `Select` with eight options: an "unknown" sentinel (maps to `null`) followed by the seven entries of `SIGNATURE_GROUP_CATALOG`. Option rows and the popup are vertically compacted (`py-1` items, `p-0.5` content) to fit the dense Signatures module.
 
 ### Behaviour & Interactions
 - Treats the internal sentinel string `__none__` as `null` in both directions.

@@ -16,7 +16,7 @@
 | targetClass | string \| null | no | Selected WH type's destination class (e.g. `LS`). When set, filters options to far ends matching that class; the bound `value` is always kept. `null`/omitted = no filter (e.g. K162 leads anywhere). |
 
 ### Renders
-A shadcn `Select` listing each incident connection. Each option uses a flex `justify-between` layout: system name on the left, concatenated class+tag (e.g. "C2G") in a muted span on the right. First option is an "—" sentinel mapped to `null`.
+A shadcn `Select` listing each incident connection. Each option uses a flex `justify-between` layout: system name on the left, concatenated class+tag (e.g. "C2G") on the right. The class+tag span is bold and color-coded via `systemClassColor` (keyed on the far end's `security`) — the same palette the map uses for system-node statics; the whole label including the tag carries the colour. First option is an "—" sentinel mapped to `null`. The closed trigger mirrors the option layout (label left, color-coded class+tag right) via a `SelectValue` render function. Option rows and the popup are vertically compacted (`py-1` items, `p-0.5` content) to fit the dense Signatures module.
 
 ### Behaviour & Interactions
 - No API call — works entirely off the props passed by `MapCanvas`.
@@ -26,4 +26,5 @@ A shadcn `Select` listing each incident connection. Each option uses a flex `jus
 
 ### Depends On
 - `Select*` from `@/components/ui/select`
+- `systemClassColor` from `@/components/map/styling` — class+tag colour coding
 - `MapConnectionEdge`, `MapSystemNode` from `@/types`
