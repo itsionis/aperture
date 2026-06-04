@@ -15,6 +15,20 @@ export const FAST_PASTE_OPTIONS: BulkPasteOptions = {
 };
 
 /**
+ * One-shot "Lazy delete" variant of the CTRL+V fast-paste path. Same as
+ * `FAST_PASTE_OPTIONS` but also removes existing sigs absent from the paste —
+ * armed deliberately via the Signatures-panel toggle and consumed after a
+ * single direct paste. Orphaned connections are still left in place; the toggle
+ * only governs the signatures themselves.
+ */
+export const LAZY_DELETE_PASTE_OPTIONS: BulkPasteOptions = {
+  addMissing: true,
+  updateExisting: true,
+  removeMissing: true,
+  removeOrphanedConnections: false,
+};
+
+/**
  * Shared bulk-paste apply: POST → fold the committed payloads via `onResult` →
  * success toast. Used by both the paste dialog and the CTRL+V hotkey so the
  * apply/toast logic stays in one place. Failures already toast inside the

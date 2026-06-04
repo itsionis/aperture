@@ -17,10 +17,12 @@
 | onDelete | (signatureId: string) => void | yes | Called from the row trash button. |
 | onBulkPaste | (payloads: MapEventPayload[]) => void | yes | Forwarded to `SignaturePasteDialog`; caller registers each `eventId` in its dedupe set and applies each payload locally. |
 | onConnectionPatch | (connectionId: string, patch: UpdateConnectionBody) => void | yes | Used to auto-set a linked connection's jump-mass size from the WH type (see below). Wired to `MapCanvas`'s `onConnectionPatch` (optimistic). |
+| lazyDelete | boolean | yes | Whether the one-shot CTRL+V "Lazy delete" arm is active (state owned by `MapCanvas`, shared with `SignaturePasteHotkey`). |
+| onLazyDeleteChange | (next: boolean) => void | yes | Toggles the lazy-delete arm from the header button. |
 
 ### Renders
 A `Card` with:
-- Header row: the title (`Signatures — <system alias or name>`) and, when a system is selected, a **Paste from scanner** button.
+- Header row: the title (`Signatures — <system alias or name>`) and, when a system is selected, a **Lazy delete** toggle (`LazyDeleteToggle`) and a **Paste from scanner** button grouped on the right.
 - Body: when no system is selected, a placeholder message. When a system is selected, an eight-column table and a draft-input row below it. TTL is a forward countdown (`formatRelativeFromMs`); Created and Updated are backward "time ago" strings (`formatAgoFromMs`).
 
 ### Behaviour & Interactions
@@ -39,6 +41,7 @@ A `Card` with:
 - The add form's `sigId` is auto-uppercased; required (Add disabled while empty). Group dropdown is required to enable the Type cell.
 - `expiresAt` for new sigs defaults to `now + apertureConfig.SIGNATURE_DEFAULT_TTL_MS`.
 - **Paste from scanner** opens `SignaturePasteDialog` with the active system pre-bound.
+- **Lazy delete** (`LazyDeleteToggle`): a one-shot arm button. Click to arm (renders `destructive` variant, label "Lazy delete armed"); while armed, the next direct CTRL+V scanner paste also removes sigs absent from the paste. The arm state lives in `MapCanvas` and is consumed (disarmed) by `SignaturePasteHotkey` once that paste commits — a deliberate arm-then-paste gesture so an accidental Ctrl+V can't wipe sigs. Only affects the direct-paste hotkey, not the paste dialog (which carries its own remove options).
 
 ### Depends On
 - `WormholeTypeSelect`, `SignatureGroupSelect`, `ConnectionSelect`, `SiteTypeCombobox`

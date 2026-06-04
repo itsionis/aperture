@@ -10,6 +10,11 @@ Non-destructive defaults for the CTRL+V path: `{ addMissing: true, updateExistin
 
 ---
 
+### LAZY_DELETE_PASTE_OPTIONS: BulkPasteOptions
+One-shot "Lazy delete" variant of the CTRL+V path: `{ addMissing: true, updateExisting: true, removeMissing: true, removeOrphanedConnections: false }`. Same as `FAST_PASTE_OPTIONS` but also removes existing sigs absent from the paste; armed deliberately via the Signatures-panel toggle and consumed after a single direct paste (see `SignaturePasteHotkey`). Orphaned connections are left in place.
+
+---
+
 ### applySignaturePaste(args): Promise<boolean>
 POSTs the rows to the bulk endpoint via `pasteSignaturesOnServer`, calls `onResult(payloads)` with the committed event payloads on success, and toasts a summary (`connectionsRemoved` is appended only when > 0). Errors already toast inside the client wrapper.
 

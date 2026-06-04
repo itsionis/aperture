@@ -24,6 +24,7 @@ import type {
   MapEventPayload,
   MapLayoutConfig,
   MapSettings,
+  MapSignature,
   MapSystemNode,
   MapViewData,
   PanelId,
@@ -132,6 +133,14 @@ function mergeLayouts(
 const nodeTypes = { system: SystemNode };
 const edgeTypes = { connection: ConnectionEdge };
 
+/** A pending "also delete the subchain?" offer raised by a deleted wormhole sig. */
+type SubchainSigOffer = {
+  headId: string;
+  anchorId: string;
+  headName: string;
+  count: number;
+};
+
 export function MapCanvas({
   data,
   routes,
@@ -182,20 +191,20 @@ export function MapCanvas({
     headName: string;
     count: number;
   } | null>(null);
-  // Non-blocking "also delete the subchain?" prompt, offered after a wormhole
-  // sig with a populated "Leads to" is deleted. `null` ⇒ no prompt.
-  const [subchainSigPrompt, setSubchainSigPrompt] = useState<{
-    headId: string;
-    anchorId: string;
-    headName: string;
-    count: number;
-  } | null>(null);
+  // Queue of "also delete the subchain?" prompts, offered after a wormhole sig
+  // with a populated "Leads to" is deleted — one per such sig. The row trash
+  // icon enqueues a single entry; a lazy-delete paste can enqueue several at
+  // once. `[0]` is the active prompt; an empty queue ⇒ no prompt.
+  const [subchainSigPrompts, setSubchainSigPrompts] = useState<SubchainSigOffer[]>([]);
   // Pending delete-disconnected confirmation. The doomed systems (everything cut
   // off from the Home) are highlighted via `selectedSystemIds` while open.
   const [disconnectedPreview, setDisconnectedPreview] = useState<{ count: number } | null>(null);
   const [mapInfoOpen, setMapInfoOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addSystemOpen, setAddSystemOpen] = useState(false);
+  // One-shot "Lazy delete" arm for the CTRL+V fast paste: when on, the next
+  // direct scanner paste also removes missing sigs, then disarms itself.
+  const [lazyDeleteSigs, setLazyDeleteSigs] = useState(false);
   const [viewData, setViewData] = useState<MapViewData>(data);
   // Captured via ReactFlow's onInit so the manual-add flow can place new nodes
   // at the current viewport centre rather than (0,0).
@@ -681,19 +690,17 @@ export function MapCanvas({
     [mapId, runOptimistic],
   );
 
-  const onSignatureDelete = useCallback(
-    (signatureId: string) => {
-      const sig = viewData.signatures.find((s) => s.id === signatureId);
-      runOptimistic({ kind: 'signature.delete', eventId: 0, id: signatureId }, () =>
-        deleteSignatureOnServer({ mapId, signatureId }),
-      );
-      // If the sig resolved to a wormhole, offer to delete the subchain behind
-      // it. Head = the connection's far end; anchor mirrors the two context-menu
-      // paths (Home when set, else the sig's own system — always a neighbour of
-      // head). Bail quietly on any missing piece or an empty subchain.
-      if (!sig || sig.mapConnectionId == null) return;
+  // If a deleted sig resolved to a wormhole, build the "delete the subchain
+  // behind it?" offer. Head = the connection's far end; anchor mirrors the two
+  // context-menu paths (Home when set, else the sig's own system — always a
+  // neighbour of head). Returns null on any missing piece or an empty subchain.
+  // Computed against the current (pre-removal) graph, so callers must invoke it
+  // before folding the delete into `viewData`.
+  const buildSubchainSigOffer = useCallback(
+    (sig: MapSignature | undefined): SubchainSigOffer | null => {
+      if (!sig || sig.mapConnectionId == null) return null;
       const conn = viewData.connections.find((c) => c.id === sig.mapConnectionId);
-      if (!conn) return;
+      if (!conn) return null;
       const headId = conn.source === sig.mapSystemId ? conn.target : conn.source;
       const anchorId = viewData.map.homeMapSystemId ?? sig.mapSystemId;
       const ids = computeSubchain({
@@ -702,16 +709,46 @@ export function MapCanvas({
         headId,
         anchorId,
       });
-      if (ids.size === 0) return;
+      if (ids.size === 0) return null;
       const head = viewData.systems.find((s) => s.id === headId);
-      setSubchainSigPrompt({
+      return {
         headId,
         anchorId,
         headName: head ? head.alias?.trim() || head.name : headId,
         count: ids.size,
-      });
+      };
     },
-    [mapId, runOptimistic, viewData],
+    [viewData],
+  );
+
+  const onSignatureDelete = useCallback(
+    (signatureId: string) => {
+      const sig = viewData.signatures.find((s) => s.id === signatureId);
+      runOptimistic({ kind: 'signature.delete', eventId: 0, id: signatureId }, () =>
+        deleteSignatureOnServer({ mapId, signatureId }),
+      );
+      const offer = buildSubchainSigOffer(sig);
+      if (offer) setSubchainSigPrompts((q) => [...q, offer]);
+    },
+    [mapId, runOptimistic, viewData, buildSubchainSigOffer],
+  );
+
+  // Fold a lazy-delete paste into state, then offer the subchain prompt for each
+  // wormhole sig the paste removed — the same prompt the row trash icon raises.
+  // The offers are built from the pre-fold graph (removed sigs still carry their
+  // `mapConnectionId`), then `onBulkPaste` applies the removals.
+  const onLazyDeletePasteResult = useCallback(
+    (payloads: MapEventPayload[]) => {
+      const offers: SubchainSigOffer[] = [];
+      for (const p of payloads) {
+        if (p.kind !== 'signature.delete') continue;
+        const offer = buildSubchainSigOffer(viewData.signatures.find((s) => s.id === p.id));
+        if (offer) offers.push(offer);
+      }
+      onBulkPaste(payloads);
+      if (offers.length > 0) setSubchainSigPrompts((q) => [...q, ...offers]);
+    },
+    [onBulkPaste, buildSubchainSigOffer, viewData],
   );
 
   // ---- Delete subchain ----------------------------------------------------
@@ -772,17 +809,21 @@ export function MapCanvas({
     setSelectedSystemIds(new Set());
   }, [subchainPreview, mapId, onBulkPaste]);
 
+  const dismissSubchainSig = useCallback(() => {
+    setSubchainSigPrompts((q) => q.slice(1));
+  }, []);
+
   const onConfirmSubchainSig = useCallback(async () => {
-    if (!subchainSigPrompt) return;
-    const { headId, anchorId } = subchainSigPrompt;
-    setSubchainSigPrompt(null);
+    const active = subchainSigPrompts[0];
+    if (!active) return;
+    setSubchainSigPrompts((q) => q.slice(1));
     const result = await deleteSubchainOnServer({
       mapId,
-      headMapSystemId: headId,
-      anchorMapSystemId: anchorId,
+      headMapSystemId: active.headId,
+      anchorMapSystemId: active.anchorId,
     });
     if (result.ok) onBulkPaste(result.data.payloads);
-  }, [subchainSigPrompt, mapId, onBulkPaste]);
+  }, [subchainSigPrompts, mapId, onBulkPaste]);
 
   // ---- Delete disconnected -----------------------------------------------
   // Compute the systems cut off from the Home, highlight them, and open the
@@ -1001,12 +1042,12 @@ export function MapCanvas({
               onPatchSignature={onSignaturePatch}
               onConnectionPatch={onConnectionPatch}
             />
-            {subchainSigPrompt && (
+            {subchainSigPrompts[0] && (
               <SubchainDeletePrompt
-                headName={subchainSigPrompt.headName}
-                count={subchainSigPrompt.count}
+                headName={subchainSigPrompts[0].headName}
+                count={subchainSigPrompts[0].count}
                 onConfirm={onConfirmSubchainSig}
-                onDismiss={() => setSubchainSigPrompt(null)}
+                onDismiss={dismissSubchainSig}
               />
             )}
             {subchainPreview && (
@@ -1100,6 +1141,8 @@ export function MapCanvas({
             onDelete={onSignatureDelete}
             onBulkPaste={onBulkPaste}
             onConnectionPatch={onConnectionPatch}
+            lazyDelete={lazyDeleteSigs}
+            onLazyDeleteChange={setLazyDeleteSigs}
           />
         );
       case 'inspector':
@@ -1173,6 +1216,9 @@ export function MapCanvas({
           systems={viewData.systems}
           viewerCharacterIds={viewerCharacterIds}
           onBulkPaste={onBulkPaste}
+          lazyDelete={lazyDeleteSigs}
+          onLazyDeleteConsume={() => setLazyDeleteSigs(false)}
+          onLazyDeletePasteResult={onLazyDeletePasteResult}
         />
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-1">

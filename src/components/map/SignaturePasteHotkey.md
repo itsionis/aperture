@@ -12,6 +12,9 @@
 | systems | MapSystemNode[] | yes | All on-map systems — used to resolve the viewer's current-location name |
 | viewerCharacterIds | number[] | yes | The viewer's account character ids; matched against live presence to find their current location |
 | onBulkPaste | (payloads: MapEventPayload[]) => void | yes | Folds the committed events into map state + dedupe set |
+| lazyDelete | boolean | yes | One-shot arm (from the Signatures-panel toggle): when true, the next committed direct paste also removes missing sigs |
+| onLazyDeleteConsume | () => void | yes | Called to disarm the one-shot once a paste commits |
+| onLazyDeletePasteResult | (payloads: MapEventPayload[]) => void | yes | Result handler used in place of `onBulkPaste` for an armed lazy-delete paste; folds the payloads and offers the subchain-delete prompt for each removed wormhole sig |
 
 ### Renders
 Nothing visible except a shadcn `Dialog` confirm shown when no pilot is in the selected system. Must be rendered inside `MapPresenceProvider`.
@@ -23,7 +26,7 @@ Nothing visible except a shadcn `Dialog` confirm shown when no pilot is in the s
 - No system selected → `toast.info(...)` hint, no apply.
 - Computes the live set of EVE systems the viewer's pilots are in (`viewerCharacterIds.map(getSystemForCharacter)`). **Applies directly only when one of those equals the selected system's EVE id** (fast path). Otherwise opens the confirm dialog — this covers both "your pilot is in a different system" and "none of your pilots is located anywhere" (Cancel aborts, "Apply anyway" applies).
 - Confirm copy adapts: names a system a pilot is in when one is known, else "None of your characters is in {target}".
-- Apply uses `applySignaturePaste` with `FAST_PASTE_OPTIONS` (add + update, never remove).
+- Apply uses `applySignaturePaste` with `FAST_PASTE_OPTIONS` (add + update, never remove) — unless the one-shot `lazyDelete` arm is set, in which case it uses `LAZY_DELETE_PASTE_OPTIONS` (add + update + remove-missing) and routes the result through `onLazyDeletePasteResult` (which folds the paste *and* raises the subchain-delete prompt for each removed wormhole sig) instead of `onBulkPaste`. The armed flag is captured at apply time and only consumed (`onLazyDeleteConsume`) once the paste actually commits, so a failed paste leaves it armed to retry. Applies to both the fast path and the confirm-dialog "Apply anyway" path.
 
 ### Emits / Calls
 - `usePresenceStore()` — read live at paste time via `getSystemForCharacter(id)`.

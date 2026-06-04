@@ -109,6 +109,8 @@ export function SignatureModule({
   onDelete,
   onBulkPaste,
   onConnectionPatch,
+  lazyDelete,
+  onLazyDeleteChange,
 }: {
   mapId: string;
   system: MapSystemNode | null;
@@ -120,6 +122,8 @@ export function SignatureModule({
   onDelete: (signatureId: string) => void;
   onBulkPaste: (payloads: MapEventPayload[]) => void;
   onConnectionPatch: (connectionId: string, patch: UpdateConnectionBody) => void;
+  lazyDelete: boolean;
+  onLazyDeleteChange: (next: boolean) => void;
 }) {
   return (
     <Card>
@@ -128,12 +132,15 @@ export function SignatureModule({
           Signatures{system ? ` — ${system.alias ?? system.name}` : ''}
         </CardTitle>
         {system && (
-          <SignaturePasteButton
-            mapId={mapId}
-            system={system}
-            signatures={signatures}
-            onBulkPaste={onBulkPaste}
-          />
+          <div className="flex items-center gap-2">
+            <LazyDeleteToggle armed={lazyDelete} onArmedChange={onLazyDeleteChange} />
+            <SignaturePasteButton
+              mapId={mapId}
+              system={system}
+              signatures={signatures}
+              onBulkPaste={onBulkPaste}
+            />
+          </div>
         )}
       </CardHeader>
       <CardContent>
@@ -157,6 +164,35 @@ export function SignatureModule({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * One-shot "Lazy delete" toggle for the CTRL+V fast-paste path. While armed
+ * (destructive variant), the next direct paste also removes sigs absent from
+ * the paste; `SignaturePasteHotkey` disarms it once that paste commits. Kept as
+ * a deliberate arm-then-paste gesture so an accidental Ctrl+V can't wipe sigs.
+ */
+function LazyDeleteToggle({
+  armed,
+  onArmedChange,
+}: {
+  armed: boolean;
+  onArmedChange: (next: boolean) => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant={armed ? 'destructive' : 'outline'}
+      size="sm"
+      className="gap-1.5"
+      aria-pressed={armed}
+      title="When armed, the next Ctrl+V scanner paste also removes signatures not in the paste. Disarms after one paste."
+      onClick={() => onArmedChange(!armed)}
+    >
+      <Trash2 className="size-3.5" />
+      {armed ? 'Lazy delete armed' : 'Lazy delete'}
+    </Button>
   );
 }
 

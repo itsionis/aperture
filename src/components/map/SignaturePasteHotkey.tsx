@@ -12,7 +12,11 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { parseSignaturePaste } from '@/lib/map/signatureParser';
-import { applySignaturePaste } from '@/lib/map/applySignaturePaste';
+import {
+  applySignaturePaste,
+  FAST_PASTE_OPTIONS,
+  LAZY_DELETE_PASTE_OPTIONS,
+} from '@/lib/map/applySignaturePaste';
 import { usePresenceStore } from './MapPresenceContext';
 import type { MapEventPayload, MapSystemNode, ParsedSigRow } from '@/types';
 
@@ -32,12 +36,25 @@ export function SignaturePasteHotkey({
   systems,
   viewerCharacterIds,
   onBulkPaste,
+  lazyDelete,
+  onLazyDeleteConsume,
+  onLazyDeletePasteResult,
 }: {
   mapId: string;
   selectedSystem: MapSystemNode | null;
   systems: MapSystemNode[];
   viewerCharacterIds: number[];
   onBulkPaste: (payloads: MapEventPayload[]) => void;
+  /** When armed, the next committed direct paste also removes missing sigs. */
+  lazyDelete: boolean;
+  /** Disarms the one-shot lazy-delete toggle after a paste commits. */
+  onLazyDeleteConsume: () => void;
+  /**
+   * Result handler for a lazy-delete paste: folds the payloads and offers the
+   * subchain-delete prompt for each removed wormhole sig. Used in place of
+   * `onBulkPaste` when the lazy-delete arm is set.
+   */
+  onLazyDeletePasteResult: (payloads: MapEventPayload[]) => void;
 }) {
   const store = usePresenceStore();
 
@@ -52,18 +69,47 @@ export function SignaturePasteHotkey({
   // through this ref so a selection or location change doesn't re-subscribe.
   // The ref is updated in an effect (not during render) — same pattern as
   // `useTraversals` in MapPresenceContext.
-  const latest = useRef({ mapId, selectedSystem, systems, viewerCharacterIds, store, onBulkPaste });
+  const latest = useRef({
+    mapId,
+    selectedSystem,
+    systems,
+    viewerCharacterIds,
+    store,
+    onBulkPaste,
+    lazyDelete,
+    onLazyDeleteConsume,
+    onLazyDeletePasteResult,
+  });
   useEffect(() => {
-    latest.current = { mapId, selectedSystem, systems, viewerCharacterIds, store, onBulkPaste };
+    latest.current = {
+      mapId,
+      selectedSystem,
+      systems,
+      viewerCharacterIds,
+      store,
+      onBulkPaste,
+      lazyDelete,
+      onLazyDeleteConsume,
+      onLazyDeletePasteResult,
+    };
   });
 
   const apply = useCallback((rows: ParsedSigRow[], targetSystem: MapSystemNode) => {
-    const { mapId, onBulkPaste } = latest.current;
+    const { mapId, onBulkPaste, lazyDelete, onLazyDeleteConsume, onLazyDeletePasteResult } =
+      latest.current;
+    // Capture the armed flag at apply time; the one-shot is consumed only once
+    // the paste actually commits, so a failed paste leaves it armed to retry.
+    // When armed, the result handler also raises the subchain-delete prompt for
+    // each removed wormhole sig.
+    const armed = lazyDelete;
     void applySignaturePaste({
       mapId,
       mapSystemId: targetSystem.id,
       rows,
-      onResult: onBulkPaste,
+      options: armed ? LAZY_DELETE_PASTE_OPTIONS : FAST_PASTE_OPTIONS,
+      onResult: armed ? onLazyDeletePasteResult : onBulkPaste,
+    }).then((ok) => {
+      if (ok && armed) onLazyDeleteConsume();
     });
   }, []);
 
