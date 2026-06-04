@@ -67,7 +67,7 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
 
   return (
     <div
-      className="relative min-w-36 cursor-pointer rounded-md bg-card text-xs text-card-foreground shadow-sm ring-1 transition-[box-shadow,outline,transform] duration-50"
+      className="relative min-w-36 cursor-pointer rounded-md bg-map-node text-xs text-card-foreground shadow-sm ring-1 transition-[box-shadow,outline,transform] duration-50"
       style={{
         borderLeft: `4px solid ${color}`,
         // Selected tiles get a prominent halo in their status colour: a solid
