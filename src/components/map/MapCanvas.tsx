@@ -1086,8 +1086,10 @@ export function MapCanvas({
               systems={viewData.systems}
               connections={viewData.connections}
               homeMapSystemId={viewData.map.homeMapSystemId}
+              selectedSystemIds={selectedSystemIds}
               onSystemPatch={onSystemPatch}
               onSystemRemove={onSystemRemove}
+              onSystemRemoveSelected={removeSelectedSystems}
               onConnectionPatch={onConnectionPatch}
               onConnectionDelete={onConnectionDelete}
               onAddSystemAt={onAddSystemAt}

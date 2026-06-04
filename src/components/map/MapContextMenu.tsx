@@ -54,8 +54,10 @@ export function MapContextMenu({
   systems,
   connections,
   homeMapSystemId,
+  selectedSystemIds,
   onSystemPatch,
   onSystemRemove,
+  onSystemRemoveSelected,
   onConnectionPatch,
   onConnectionDelete,
   onAddSystemAt,
@@ -70,8 +72,13 @@ export function MapContextMenu({
   connections: MapConnectionEdge[];
   /** `ap_map_system.id` of the designated Home, or null. Drives the subchain anchor. */
   homeMapSystemId: string | null;
+  /** Current multi-selection. When the right-clicked system is in here, "Remove
+      from map" acts on the whole group via `onSystemRemoveSelected`. */
+  selectedSystemIds: Set<string>;
   onSystemPatch: (id: string, patch: UpdateSystemBody) => void;
   onSystemRemove: (id: string) => void;
+  /** Removes the entire current multi-selection (mirrors the Delete key). */
+  onSystemRemoveSelected: () => void;
   onConnectionPatch: (id: string, patch: UpdateConnectionBody) => void;
   onConnectionDelete: (id: string) => void;
   onAddSystemAt: (clientX: number, clientY: number) => void;
@@ -136,8 +143,10 @@ export function MapContextMenu({
               systems,
               connections,
               homeMapSystemId,
+              selectedSystemIds,
               onSystemPatch,
               onSystemRemove,
+              onSystemRemoveSelected,
               onConnectionPatch,
               onConnectionDelete,
               onAddSystemAt,
@@ -159,8 +168,10 @@ function renderItems({
   systems,
   connections,
   homeMapSystemId,
+  selectedSystemIds,
   onSystemPatch,
   onSystemRemove,
+  onSystemRemoveSelected,
   onConnectionPatch,
   onConnectionDelete,
   onAddSystemAt,
@@ -174,8 +185,10 @@ function renderItems({
   systems: MapSystemNode[];
   connections: MapConnectionEdge[];
   homeMapSystemId: string | null;
+  selectedSystemIds: Set<string>;
   onSystemPatch: (id: string, patch: UpdateSystemBody) => void;
   onSystemRemove: (id: string) => void;
+  onSystemRemoveSelected: () => void;
   onConnectionPatch: (id: string, patch: UpdateConnectionBody) => void;
   onConnectionDelete: (id: string) => void;
   onAddSystemAt: (clientX: number, clientY: number) => void;
@@ -190,6 +203,11 @@ function renderItems({
     case 'system': {
       const system = systems.find((s) => s.id === target.id);
       if (!system) return <MenuItem disabled>System not found</MenuItem>;
+      // Right-clicking a system that's part of the current multi-selection makes
+      // "Remove from map" act on the whole group; right-clicking outside the
+      // selection removes only that one (selection is left untouched on r-click).
+      const inSelection = selectedSystemIds.size > 1 && selectedSystemIds.has(system.id);
+      const removeCount = inSelection ? selectedSystemIds.size : 1;
       return (
         <SystemItems
           system={system}
@@ -197,12 +215,14 @@ function renderItems({
           connections={connections}
           isHome={homeMapSystemId === system.id}
           hasHome={homeMapSystemId !== null}
+          removeCount={removeCount}
           onPatch={(patch) => {
             onSystemPatch(system.id, patch);
             onClose();
           }}
           onRemove={() => {
-            onSystemRemove(system.id);
+            if (inSelection) onSystemRemoveSelected();
+            else onSystemRemove(system.id);
             onClose();
           }}
           onDeleteSubchain={() => {
@@ -279,6 +299,7 @@ function SystemItems({
   connections,
   isHome,
   hasHome,
+  removeCount,
   onPatch,
   onRemove,
   onDeleteSubchain,
@@ -292,6 +313,8 @@ function SystemItems({
   isHome: boolean;
   /** The map has a designated Home (drives single-click vs keep-side fallback). */
   hasHome: boolean;
+  /** How many systems "Remove from map" will delete (>1 ⇒ whole selection). */
+  removeCount: number;
   onPatch: (patch: UpdateSystemBody) => void;
   onRemove: () => void;
   onDeleteSubchain: () => void;
@@ -343,7 +366,7 @@ function SystemItems({
         icon={<Trash2 className="size-3.5" />}
         onClick={onRemove}
       >
-        Remove from map
+        {removeCount > 1 ? `Remove ${removeCount} from map` : 'Remove from map'}
       </MenuItem>
 
       {/* Delete subchain: hidden for the Home node (it can't be a head). With a
