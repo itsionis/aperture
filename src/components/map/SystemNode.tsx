@@ -18,6 +18,7 @@ import { usePresenceForSystem } from './MapPresenceContext';
 import { useSignatureIndicator } from './MapSignatureIndicatorContext';
 import { useUnderglowForSystem } from './MapUnderglowContext';
 import { SystemUnderglow } from './SystemUnderglow';
+import { RALLY_UNDERGLOW } from './underglowPresets';
 
 // System tile. Status stripe + security badge + tag + alias/name + presence
 // badge + lock + a J-space statics line. Alias and tag are inline
@@ -80,6 +81,10 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
       }}
       title={`${data.regionName} › ${data.constellationName}`}
     >
+      {/* Persistent rally underglow, derived straight from map state so it lives
+          exactly as long as `rallyAt` is set. Kept separate from the transient
+          store glow below so a coinciding killmail/ping can't clear it. */}
+      {data.rallyAt && <SystemUnderglow {...RALLY_UNDERGLOW} />}
       {glow && <SystemUnderglow key={glow.token} {...glow.config} />}
       <SignatureIndicators
         stale={sigIndicator.stale}
