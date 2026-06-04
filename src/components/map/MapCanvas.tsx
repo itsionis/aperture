@@ -91,6 +91,7 @@ import { AddSystemDialog } from './AddSystemDialog';
 import { ConnectionEdge, type ConnectionEdgeData } from './ConnectionEdge';
 import { MapPresenceProvider } from './MapPresenceContext';
 import { SignaturePasteHotkey } from './SignaturePasteHotkey';
+import { TransitSignaturePrompt } from './TransitSignaturePrompt';
 import { MapTravelProvider, TravelBridge } from './MapTravelContext';
 import { MapUnderglowProvider } from './MapUnderglowContext';
 import { MapUnderglowBridge } from './MapUnderglowBridge';
@@ -915,6 +916,14 @@ export function MapCanvas({
                 Remove {selectedSystemIds.size}
               </Button>
             )}
+            <TransitSignaturePrompt
+              mapId={mapId}
+              systems={viewData.systems}
+              connections={viewData.connections}
+              signatures={viewData.signatures}
+              viewerCharacterIds={viewerCharacterIds}
+              onPatchSignature={onSignaturePatch}
+            />
             <ReactFlow
               nodes={nodes}
               edges={edges}
