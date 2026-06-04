@@ -24,15 +24,15 @@ export interface PanelDef {
 export const PANELS: PanelDef[] = [
   { id: 'canvas', title: 'Map', defaultVisible: true, minW: 4, minH: 6 },
   { id: 'signatures', title: 'Signatures', defaultVisible: true, minW: 2, minH: 3 },
-  { id: 'inspector', title: 'Inspector', defaultVisible: true, minW: 2, minH: 3 },
+  { id: 'inspector', title: 'Inspector', defaultVisible: true, minW: 1, minH: 3 },
   { id: 'route', title: 'Routes', defaultVisible: true, minW: 2, minH: 2 },
   { id: 'intel', title: 'Intel', defaultVisible: true, minW: 2, minH: 2 },
   { id: 'structure', title: 'Structures', defaultVisible: true, minW: 2, minH: 2 },
-  { id: 'killStats', title: 'Kill Statistics', defaultVisible: true, minW: 2, minH: 2 },
-  { id: 'systemGraph', title: 'System Graph', defaultVisible: true, minW: 2, minH: 3 },
+  { id: 'killStats', title: 'Kill Statistics', defaultVisible: true, minW: 1, minH: 2 },
+  { id: 'systemGraph', title: 'System Graph', defaultVisible: true, minW: 1, minH: 3 },
   { id: 'systemKillboard', title: 'System Killboard', defaultVisible: true, minW: 2, minH: 3 },
-  { id: 'tags', title: 'Tags', defaultVisible: true, minW: 2, minH: 2 },
-  { id: 'thera', title: 'Thera', defaultVisible: true, minW: 2, minH: 2 },
+  { id: 'tags', title: 'Tags', defaultVisible: true, minW: 1, minH: 2 },
+  { id: 'thera', title: 'Thera', defaultVisible: true, minW: 1, minH: 2 },
 ];
 
 // Right-column modules, in display order (everything except canvas + signatures).
@@ -48,7 +48,10 @@ const RIGHT_COLUMN: PanelId[] = [
   'thera',
 ];
 
-const PANEL_MIN: Record<PanelId, { minW: number; minH: number }> = Object.fromEntries(
+/** Per-panel resize floors, keyed by id. Authoritative — re-applied to stored
+ * layouts at render time so lowering a panel's `minW`/`minH` takes effect for
+ * existing saved layouts without disturbing their persisted positions. */
+export const PANEL_MIN: Record<PanelId, { minW: number; minH: number }> = Object.fromEntries(
   PANELS.map((p) => [p.id, { minW: p.minW, minH: p.minH }]),
 ) as Record<PanelId, { minW: number; minH: number }>;
 

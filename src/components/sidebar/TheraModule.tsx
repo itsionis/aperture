@@ -175,7 +175,7 @@ export function TheraModule({
                   {group.rows.map((row) => (
                     <li
                       key={`${row.hubSystemId}-${row.targetSystemId}-${row.signatureId ?? ''}`}
-                      className="flex items-center gap-2"
+                      className="flex items-center gap-1"
                     >
                       <span
                         aria-hidden

@@ -200,7 +200,7 @@ function SystemInspector({
         <div className="flex justify-end">
           <Button type="button" variant="destructive" size="sm" onClick={onRemove} className="gap-1.5">
             <Trash2 className="size-3.5" />
-            Remove from map
+            Remove
           </Button>
         </div>
       </CardContent>

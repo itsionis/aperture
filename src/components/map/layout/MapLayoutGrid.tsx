@@ -10,8 +10,8 @@ import {
 } from 'react-grid-layout';
 import { type ReactNode, useMemo } from 'react';
 
-import { PANEL_BREAKPOINTS, PANEL_COLS } from '@/lib/map/layout/panels';
-import type { Breakpoint } from '@/types';
+import { PANEL_BREAKPOINTS, PANEL_COLS, PANEL_MIN } from '@/lib/map/layout/panels';
+import type { Breakpoint, PanelId } from '@/types';
 
 import { PANEL_DRAG_HANDLE_CLASS, PANEL_NO_DRAG_CLASS } from './MapPanel';
 
@@ -39,6 +39,20 @@ export function MapLayoutGrid({ layouts, onLayoutChange, children }: MapLayoutGr
     [],
   );
 
+  // Re-apply the registry resize floors over the stored layout so `PANEL_MIN`
+  // stays authoritative — lowering a panel's `minW`/`minH` in the registry takes
+  // effect for already-saved layouts without touching their persisted positions.
+  const constrainedLayouts = useMemo(() => {
+    const out = {} as Record<Breakpoint, Layout>;
+    for (const bp of Object.keys(layouts) as Breakpoint[]) {
+      out[bp] = layouts[bp].map((item) => {
+        const min = PANEL_MIN[item.i as PanelId];
+        return min ? { ...item, minW: min.minW, minH: min.minH } : item;
+      });
+    }
+    return out;
+  }, [layouts]);
+
   return (
     <div ref={containerRef} className="h-full w-full">
       {mounted ? (
@@ -46,7 +60,7 @@ export function MapLayoutGrid({ layouts, onLayoutChange, children }: MapLayoutGr
           width={width}
           breakpoints={PANEL_BREAKPOINTS}
           cols={PANEL_COLS}
-          layouts={layouts}
+          layouts={constrainedLayouts}
           rowHeight={ROW_HEIGHT}
           margin={GRID_MARGIN}
           dragConfig={dragConfig}
