@@ -14,18 +14,30 @@ import { universeStargateEdge } from '@/db/schema';
  * (each stargate pair lives as two rows) but we check both orderings
  * defensively in case a future SDE ingest stops mirroring them.
  *
- * Classifications outside `gate`/`wormhole` (e.g. cyno, jump bridge, abyssal
- * trace) are NOT modelled here — the rebuild treats every non-gate transition
- * as a wormhole. Those rarer cases land alongside the broader intel module
- * work in later stages.
+ * Classifications outside `gate`/`wormhole`/`teleport` (e.g. cyno, jump bridge,
+ * abyssal trace) are NOT modelled here — the rebuild treats every non-gate,
+ * in-space transition as a wormhole. Those rarer cases land alongside the
+ * broader intel module work in later stages.
+ *
+ * `teleport` covers pod self-destruct ("pod express"), getting podded by
+ * hostiles, and jump clones: instant moves to a medical/jump clone that the
+ * poll would otherwise misread as a wormhole. The tell is that the pilot
+ * arrives **docked** — you can never exit a wormhole already docked, so a
+ * docked arrival in a non-gate-adjacent system is a teleport-to-station, not a
+ * traversal. Gated to k-space destinations because clones can only live there.
  */
 
-export type JumpClass = 'gate' | 'wormhole';
+export type JumpClass = 'gate' | 'wormhole' | 'teleport';
 
 export interface ClassifyJumpArgs {
   fromSystemId: number;
   toSystemId: number;
+  /** Pilot arrived docked (station/structure id present in the location payload). */
+  arrivedDocked: boolean;
 }
+
+/** `universe_system.security` labels for k-space (see `src/lib/sde/security.ts`). */
+const KSPACE_LABELS = new Set(['H', 'L', '0.0']);
 
 export async function classifyJump(args: ClassifyJumpArgs): Promise<JumpClass> {
   if (args.fromSystemId === args.toSystemId) {
@@ -33,14 +45,22 @@ export async function classifyJump(args: ClassifyJumpArgs): Promise<JumpClass> {
     // it's plainly not a jump — return 'gate' so no map writes happen.
     return 'gate';
   }
-  const adjacent = await db.execute<{ adjacent: boolean }>(
-    sql`SELECT EXISTS (
-          SELECT 1 FROM universe_stargate_edge
-          WHERE (from_system_id = ${args.fromSystemId} AND to_system_id = ${args.toSystemId})
-             OR (from_system_id = ${args.toSystemId} AND to_system_id = ${args.fromSystemId})
-        ) AS adjacent`,
+  const probe = await db.execute<{ adjacent: boolean; to_security: string | null }>(
+    sql`SELECT
+          EXISTS (
+            SELECT 1 FROM universe_stargate_edge
+            WHERE (from_system_id = ${args.fromSystemId} AND to_system_id = ${args.toSystemId})
+               OR (from_system_id = ${args.toSystemId} AND to_system_id = ${args.fromSystemId})
+          ) AS adjacent,
+          (SELECT security FROM universe_system WHERE id = ${args.toSystemId}) AS to_security`,
   );
-  return adjacent.rows[0]?.adjacent ? 'gate' : 'wormhole';
+  const row = probe.rows[0];
+  if (row?.adjacent) return 'gate';
+  // Docked arrival in k-space = teleport-to-clone, never a wormhole traversal.
+  if (args.arrivedDocked && row?.to_security != null && KSPACE_LABELS.has(row.to_security)) {
+    return 'teleport';
+  }
+  return 'wormhole';
 }
 
 /**

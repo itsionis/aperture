@@ -6,10 +6,16 @@
 ---
 
 ### type JumpClass
-`'gate' | 'wormhole'`. Only two outcomes today; Aperture treats every non-gate transition as a wormhole. Rarer cases (cyno, jump bridge, abyssal trace) are not modelled here.
+`'gate' | 'wormhole' | 'teleport'`. Aperture treats every non-gate, in-space transition as a wormhole. `teleport` is a non-gate transition where the pilot arrives **docked** in k-space — pod self-destruct ("pod express"), getting podded by hostiles, or a jump clone. Rarer in-space cases (cyno, jump bridge, abyssal trace) are not modelled here and still fall through to `wormhole`.
 
-### classifyJump({ fromSystemId, toSystemId }): Promise<JumpClass>
-Single `EXISTS` probe against `universe_stargate_edge` in **both directions** (defensive against a future SDE ingest that stops mirroring each gate pair). Returns `'gate'` if a row matches, `'wormhole'` otherwise.
+### classifyJump({ fromSystemId, toSystemId, arrivedDocked }): Promise<JumpClass>
+Single SQL probe that returns both the `universe_stargate_edge` bidirectional adjacency `EXISTS` (defensive against a future SDE ingest that stops mirroring each gate pair) **and** the destination's `universe_system.security` label, in one round-trip.
+
+- gate-adjacent → `'gate'`.
+- not adjacent, `arrivedDocked`, and destination is k-space (`security ∈ {H, L, 0.0}`) → `'teleport'`. You can never exit a wormhole already docked, so a docked arrival in a non-gate-adjacent system is a teleport-to-station, never a traversal. Gated to k-space because medical/jump clones can only live there.
+- otherwise → `'wormhole'`.
+
+`arrivedDocked` is derived by the caller from `station_id`/`structure_id` on the `getCharacterLocation` payload (present only when docked).
 
 `fromSystemId === toSystemId` short-circuits to `'gate'` so the location-poll can call it without a same-system pre-check — same-system means "no jump", which is functionally the same as "ignore this transition".
 

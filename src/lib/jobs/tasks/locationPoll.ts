@@ -177,7 +177,9 @@ async function poll(payload: LocationPollPayload, helpers: JobHelpers): Promise<
     await reenqueue(helpers, payload, reenqueuedInMs);
 
     // Step 7 — classify + fan-out. First poll (`previousSystemId === null`)
-    // and same-system ticks both short-circuit. Gate jumps are observed-only.
+    // and same-system ticks both short-circuit. Gate jumps and `teleport`
+    // (pod self-destruct / podded / jump clone — arrived docked in k-space)
+    // are observed-only: location is already persisted, so we just don't fold.
     let jumpClass: JumpClass | null = null;
     let folds: FoldSummary[] | undefined;
     if (
@@ -187,6 +189,7 @@ async function poll(payload: LocationPollPayload, helpers: JobHelpers): Promise<
       jumpClass = await classifyJump({
         fromSystemId: character.lastSystemId,
         toSystemId: location.solar_system_id,
+        arrivedDocked: location.station_id != null || location.structure_id != null,
       });
       if (jumpClass === 'wormhole') {
         // Resolve the jumping ship's mass once (same ship across every tracked

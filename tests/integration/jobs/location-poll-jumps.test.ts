@@ -46,6 +46,9 @@ async function systemPos(mapId: bigint, systemId: number): Promise<{ x: number; 
  *    nothing — `ap_map_event` row count for the map is unchanged.
  *  - Wormhole jump (no edge between the systems) writes exactly three events
  *    per active tracked map (`system.added` × 2 + `connection.create`).
+ *  - Teleport (docked arrival in k-space: pod self-destruct / jump clone) writes
+ *    nothing — `jumpClass: 'teleport'`, no fold. A docked arrival in a w-space
+ *    system is still a real wormhole (the teleport branch is k-space-gated).
  *  - Re-running the same wormhole jump is idempotent: no new events.
  *  - Soft-deleted maps are excluded from the fan-out.
  *
@@ -79,10 +82,23 @@ function makeHelpers(): { helpers: JobHelpers; captured: CapturedJob[] } {
 
 const mockedEsiCall = vi.mocked(esiCall);
 
-function mockEsi(opts: { online: boolean; systemId?: number; shipTypeId?: number }): void {
+function mockEsi(opts: {
+  online: boolean;
+  systemId?: number;
+  shipTypeId?: number;
+  stationId?: number;
+  structureId?: number;
+}): void {
   mockedEsiCall.mockImplementation(async (opKey) => {
     if (opKey === 'getCharacterOnline') return { online: opts.online };
-    if (opKey === 'getCharacterLocation') return { solar_system_id: opts.systemId };
+    if (opKey === 'getCharacterLocation') {
+      // station_id / structure_id present only when docked — drives `arrivedDocked`.
+      return {
+        solar_system_id: opts.systemId,
+        ...(opts.stationId != null ? { station_id: opts.stationId } : {}),
+        ...(opts.structureId != null ? { structure_id: opts.structureId } : {}),
+      };
+    }
     if (opKey === 'getCharacterShip') {
       return {
         ship_type_id: opts.shipTypeId ?? 670,
@@ -286,6 +302,42 @@ describe.skipIf(!run)('Stage 12.2 location-poll jump classification + fan-out (r
     // "Adjacent" = within the first placement ring of the parent on each axis.
     expect(Math.abs(posC.x - posB.x)).toBeLessThanOrEqual(SLOT_X);
     expect(Math.abs(posC.y - posB.y)).toBeLessThanOrEqual(SLOT_Y);
+  });
+
+  it('pod self-destruct (C→A, arrived docked in k-space) classifies as teleport and folds nothing', async () => {
+    // Non-gate-adjacent C→A would normally be a wormhole, but the pilot arrives
+    // docked at a k-space station — a medical-clone teleport, not a traversal.
+    await db.update(apCharacter).set({ lastSystemId: SYS_C }).where(eq(apCharacter.id, CHAR_ID));
+    mockEsi({ online: true, systemId: SYS_A, stationId: 60000001 });
+    const { helpers } = makeHelpers();
+
+    await locationPoll.run({ characterId: CHAR_ID.toString() }, helpers);
+
+    expect(await eventCount(mapA)).toBe(0);
+    expect(await eventCount(mapB)).toBe(0);
+
+    const notes = await lastJobNotes();
+    expect(notes).toMatchObject({
+      jumpClass: 'teleport',
+      previousSystemId: SYS_C,
+      currentSystemId: SYS_A,
+    });
+    expect(notes!.folds).toBeUndefined();
+  });
+
+  it('arriving docked in a wormhole system still folds (clones cannot live in w-space)', async () => {
+    // B→C is non-gate-adjacent and C is w-space (C3): even a docked arrival is a
+    // real wormhole, since the k-space gate excludes it from the teleport branch.
+    await db.update(apCharacter).set({ lastSystemId: SYS_B }).where(eq(apCharacter.id, CHAR_ID));
+    mockEsi({ online: true, systemId: SYS_C, structureId: 1035000000001 });
+    const { helpers } = makeHelpers();
+
+    await locationPoll.run({ characterId: CHAR_ID.toString() }, helpers);
+
+    expect(await eventKinds(mapA)).toEqual(['system.added', 'system.added', 'connection.create']);
+
+    const notes = await lastJobNotes();
+    expect(notes!.jumpClass).toBe('wormhole');
   });
 
   it('re-adding a previously-hidden system restores its old coordinates', async () => {
