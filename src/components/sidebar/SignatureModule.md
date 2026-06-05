@@ -1,6 +1,6 @@
 ## SignatureModule
 
-**Purpose:** Standalone full-width signatures panel rendered below the map. Renders a sortable nine-column table (Sig / Group / Type / Description / Leads to / TTL / Created / Updated / delete) for the selected system; placeholder when nothing is selected.
+**Purpose:** Standalone full-width signatures panel rendered below the map. Renders a filterable, sortable nine-column table (Sig / Group / Type / Description / Leads to / TTL / Created / Updated / delete) for the selected system; placeholder when nothing is selected.
 **File:** `src/components/sidebar/SignatureModule.tsx`
 
 ### Props
@@ -23,8 +23,9 @@
 ### Renders
 A `Card` with:
 - Header row: the title (`Signatures — <system alias or name>`) and, when a system is selected, a **Lazy delete** toggle (`LazyDeleteToggle`) and a **Paste from scanner** button grouped on the right.
-- Body: when no system is selected, a placeholder message. When a system is selected, a nine-column TanStack Table and a draft-input row below it. TTL is a forward countdown (`formatRelativeFromMs`); Created and Updated are backward "time ago" strings (`formatAgoFromMs`).
+- Body: when no system is selected, a placeholder message. When a system is selected: a **filter bar** (`SignatureFilterBar`) above the table, the nine-column TanStack Table, and a draft-input row below. TTL is a forward countdown (`formatRelativeFromMs`); Created and Updated are backward "time ago" strings (`formatAgoFromMs`).
 - The **Sig**, **Group**, **Created**, and **Updated** column headers are sortable (click to sort ascending, click again to reverse, arrow indicator shows active sort). Default sort is Sig ascending. Other columns (Type, Description, Leads to, TTL, delete) are non-interactive headers.
+- The filter bar has group toggle chips (Combat / Relic / Data / Gas / Wormhole / Ore / Ghost / Unknown) and a scan-state button cycling **All → Scanned only → Unscanned only**. Both filters compose; `assignedConnectionIds` is derived from the unfiltered row list so hidden sigs still hold their connection bindings.
 
 ### Behaviour & Interactions
 - The body re-mounts on system change (`key={system.id}`) so draft state for the add form resets cleanly when the selection changes.
@@ -39,6 +40,8 @@ A `Card` with:
 - **`EditableTextCell`** is a small internal helper: a controlled `Input` with a local draft, committed on blur. It re-syncs from `value` only when the input isn't focused, so optimistic-apply and realtime updates don't clobber mid-edit typing. Controlled-mode also avoids Base UI's "uncontrolled `FieldControl` default value changed after init" warning that fires when the parent re-renders with a new `defaultValue` after a blur-triggered patch.
 - **Missing-cell highlight:** a sig is "fully scanned" when its Sig, Group, and Type are filled in — plus "Leads to" for wormholes. Each still-empty *required* cell recolors its control's border to `destructive` (via the `MISSING_CELL` descendant-variant class on the `<td>`, targeting `data-slot=select-trigger` / `data-slot=input`), so unresolved cells read red at a glance (Pathfinder's cue). Per-cell rules: Group highlights when `groupKey === null`; Type highlights when a group is set but the value is empty (`typeId` for wormholes, `name` for cosmic groups — note this *does* count a missing cosmic site name, unlike the map-node `isUnscanned` rollup); "Leads to" highlights only for wormholes with no `mapConnectionId`. The Sig cell is never highlighted (always present), and Type isn't flagged while the Group is still empty (fix the group first).
 - Filters incoming `signatures` to the current system by `mapSystemId`.
+- **Filter bar** (`SignatureFilterBar`): group chips are multi-select toggles (empty = show all groups); the scan-state button cycles All / Scanned only / Unscanned only. "Fully scanned" = group set AND type set (for wormholes `typeId`, for cosmic `name`) AND for wormholes `mapConnectionId` set. Filter state lives in `SignaturePanelBody` and resets on system change (via `key={system.id}` remount).
+- **Active-state styling:** group chips render via the local `FilterToggle` helper — active = soft violet tint (`border-violet-400/50 bg-violet-400/15 text-violet-300`), inactive = muted `outline` — so enabled filters stand out without the harshness of a solid fill. Violet is used rather than `primary` because the theme's `primary` is near-neutral and reads as gray at low opacity. The scan button tints the same way when active: emerald for "Scanned only", sky for "Unscanned only" (sky echoes the map's unscanned `Signal` pill on `SystemNode`); "All" is a plain outline. All active tints carry `dark:`-prefixed copies so they override the `outline` variant's `dark:bg-input/30`.
 - The add form's `sigId` is auto-uppercased; required (Add disabled while empty). Group dropdown is required to enable the Type cell.
 - `expiresAt` for new sigs defaults to `now + apertureConfig.SIGNATURE_DEFAULT_TTL_MS`.
 - **Paste from scanner** opens `SignaturePasteDialog` with the active system pre-bound.
@@ -53,4 +56,5 @@ A `Card` with:
 - `fetchWormholeTypes` from `@/lib/map/client` (target-class + jump-mass-band map for the Leads-to filter and connection-size auto-set)
 - `apertureConfig` (`SIGNATURE_DEFAULT_TTL_MS`) from `aperture.config`
 - `@tanstack/react-table` — `useReactTable`, `createColumnHelper`, `getSortedRowModel`, `flexRender` for the sortable table
+- `SIGNATURE_GROUP_CATALOG` from `@/lib/map/signatureGroups` (group chip iteration)
 - Types: `MapConnectionEdge`, `MapEventPayload`, `MapSignature`, `MapSystemNode`, `SignatureGroupKey` from `@/types`; body types from `@/lib/map/client`

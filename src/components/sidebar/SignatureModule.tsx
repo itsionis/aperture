@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ClipboardPaste, Trash2 } from 'lucide-react';
 import {
   createColumnHelper,
@@ -32,8 +32,12 @@ import type {
 } from '@/lib/map/client';
 import type { WhJumpMass } from '@/lib/map/enumLabels';
 import { fetchWormholeTypes } from '@/lib/map/client';
+import { SIGNATURE_GROUP_CATALOG } from '@/lib/map/signatureGroups';
 import { formatAgoFromMs, formatRelativeFromMs } from '@/lib/map/relativeTime';
+import { cn } from '@/lib/utils';
 import { apertureConfig } from '../../../aperture.config';
+
+type ScanFilter = 'all' | 'scanned' | 'unscanned';
 
 /**
  * Recolors the cell's control border to `destructive` so an unfilled required
@@ -47,15 +51,15 @@ const MISSING_CELL =
 const columnHelper = createColumnHelper<MapSignature>();
 
 const colHeaderClass: Record<string, string> = {
-  sigId:       'w-24 px-2 py-1 text-left',
-  groupKey:    'w-32 px-3 py-1 text-left',
-  type:        'w-56 px-3 py-1 text-left',
+  sigId: 'w-24 px-2 py-1 text-left',
+  groupKey: 'w-32 px-3 py-1 text-left',
+  type: 'w-56 px-3 py-1 text-left',
   description: 'px-3 py-1 text-left',
-  leadsTo:     'w-44 px-3 py-1 text-left',
-  ttl:         'w-16 px-1 py-1 text-left',
-  createdAt:   'w-24 px-1 py-1 text-left',
-  updatedAt:   'w-24 px-1 py-1 text-left',
-  actions:     'w-10 px-1 py-1',
+  leadsTo: 'w-44 px-3 py-1 text-left',
+  ttl: 'w-16 px-1 py-1 text-left',
+  createdAt: 'w-24 px-1 py-1 text-left',
+  updatedAt: 'w-24 px-1 py-1 text-left',
+  actions: 'w-10 px-1 py-1',
 };
 
 function buildGroupChangePatch(
@@ -299,11 +303,26 @@ function SignaturePanelBody({
 
   // Connections already claimed by a sig in this system. The sig↔connection
   // binding is 1:1, so these are hidden from the "Leads to" dropdown (each
-  // ConnectionSelect exempts its own current value).
+  // ConnectionSelect exempts its own current value). Derived from all rows,
+  // not filteredRows, so hidden sigs still block their connection from re-use.
   const assignedConnectionIds = useMemo(
     () => rows.map((s) => s.mapConnectionId).filter((id): id is string => id != null),
     [rows],
   );
+
+  const [groupFilter, setGroupFilter] = useState<Set<SignatureGroupKey | null>>(new Set());
+  const [scanFilter, setScanFilter] = useState<ScanFilter>('all');
+
+  const filteredRows = useMemo(() => {
+    let result = rows;
+    if (groupFilter.size > 0)
+      result = result.filter((s) => groupFilter.has(s.groupKey));
+    if (scanFilter === 'scanned')
+      result = result.filter(isFullyScanned);
+    else if (scanFilter === 'unscanned')
+      result = result.filter((s) => !isFullyScanned(s));
+    return result;
+  }, [rows, groupFilter, scanFilter]);
 
   /**
    * When a WH sig ends up with both a type and a linked connection, push the
@@ -466,7 +485,7 @@ function SignaturePanelBody({
   const [sorting, setSorting] = useState<SortingState>([{ id: 'sigId', desc: false }]);
 
   const table = useReactTable({
-    data: rows,
+    data: filteredRows,
     columns,
     getRowId: (row) => row.id,
     state: { sorting },
@@ -503,6 +522,12 @@ function SignaturePanelBody({
 
   return (
     <div className="flex flex-col gap-3">
+      <SignatureFilterBar
+        groupFilter={groupFilter}
+        onGroupFilterChange={setGroupFilter}
+        scanFilter={scanFilter}
+        onScanFilterChange={setScanFilter}
+      />
       <div className="overflow-hidden rounded-md ring-1 ring-foreground/10">
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-[11px] uppercase text-muted-foreground">
@@ -532,7 +557,7 @@ function SignaturePanelBody({
             {table.getRowModel().rows.length === 0 && (
               <tr>
                 <td colSpan={9} className="px-2 py-3 text-center text-xs text-muted-foreground">
-                  No signatures.
+                  {rows.length > 0 ? 'No signatures match the filter.' : 'No signatures.'}
                 </td>
               </tr>
             )}
@@ -666,6 +691,111 @@ function TypeCell({
       value={sig.name}
       onValueChange={(next) => onPatch(sig.id, { name: next })}
     />
+  );
+}
+
+function isFullyScanned(s: MapSignature): boolean {
+  return (
+    s.groupKey !== null &&
+    (s.groupKey === 'wormhole' ? s.typeId !== null : !!(s.name)) &&
+    (s.groupKey !== 'wormhole' || s.mapConnectionId !== null)
+  );
+}
+
+function SignatureFilterBar({
+  groupFilter,
+  onGroupFilterChange,
+  scanFilter,
+  onScanFilterChange,
+}: {
+  groupFilter: Set<SignatureGroupKey | null>;
+  onGroupFilterChange: (next: Set<SignatureGroupKey | null>) => void;
+  scanFilter: ScanFilter;
+  onScanFilterChange: (next: ScanFilter) => void;
+}) {
+  function toggleGroup(key: SignatureGroupKey | null) {
+    const next = new Set(groupFilter);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    onGroupFilterChange(next);
+  }
+  function cycleScanFilter() {
+    const cycle: ScanFilter[] = ['all', 'scanned', 'unscanned'];
+    onScanFilterChange(cycle[(cycle.indexOf(scanFilter) + 1) % cycle.length] as ScanFilter);
+  }
+  // Active scan states borrow the map indicator hues: amber = scanned/done,
+  // sky = unscanned (matches the `Signal` pill on SystemNode).
+  const scanStyle: Record<ScanFilter, { label: string; className: string }> = {
+    all: { label: 'All', className: '' },
+    scanned: {
+      label: 'Scanned only',
+      className:
+        'border-emerald-400/50 bg-emerald-400/15 text-emerald-300 hover:bg-emerald-400/25 dark:border-emerald-400/50 dark:bg-emerald-400/15 dark:hover:bg-emerald-400/25',
+    },
+    unscanned: {
+      label: 'Unscanned only',
+      className:
+        'border-sky-400/50 bg-sky-400/15 text-sky-300 hover:bg-sky-400/25 dark:border-sky-400/50 dark:bg-sky-400/15 dark:hover:bg-sky-400/25',
+    },
+  };
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-1.5">
+      <div className="flex flex-wrap items-center gap-1">
+        {SIGNATURE_GROUP_CATALOG.map(({ key, label }) => (
+          <FilterToggle
+            key={key}
+            active={groupFilter.has(key)}
+            onClick={() => toggleGroup(key)}
+          >
+            {label}
+          </FilterToggle>
+        ))}
+        <FilterToggle active={groupFilter.has(null)} onClick={() => toggleGroup(null)}>
+          Unknown
+        </FilterToggle>
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className={cn('h-6 px-2 text-xs', scanStyle[scanFilter].className)}
+        onClick={cycleScanFilter}
+      >
+        {scanStyle[scanFilter].label}
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Group-filter chip. Active reads as a filled accent button so enabled filters
+ * stand out at a glance; inactive is a quiet outline.
+ */
+function FilterToggle({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      aria-pressed={active}
+      className={cn(
+        'h-6 px-2 text-xs',
+        active
+          ? 'border-sky-400/50 bg-sky-400/15 text-sky-300 hover:bg-sky-400/25 dark:border-sky-400/50 dark:bg-sky-400/15 dark:hover:bg-sky-400/25'
+          : 'text-muted-foreground',
+      )}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
   );
 }
 
