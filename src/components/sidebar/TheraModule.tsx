@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link as LinkIcon, Plus, RefreshCw } from 'lucide-react';
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { systemClassColor } from '@/components/map/styling';
 import { fetchTheraConnections, syncTheraConnectionsOnServer } from '@/lib/map/client';
@@ -121,7 +121,6 @@ export function TheraModule({
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle>Thera connections</CardTitle>
         <CardAction className="flex items-center gap-1">
           {/* <Button
             variant="ghost"

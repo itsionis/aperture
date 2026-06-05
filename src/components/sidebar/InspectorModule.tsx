@@ -89,9 +89,6 @@ export function InspectorModule(props: {
 function EmptyInspector() {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-sm">Inspector</CardTitle>
-      </CardHeader>
       <CardContent className="text-xs text-muted-foreground">
         Select a system or connection to edit.
       </CardContent>

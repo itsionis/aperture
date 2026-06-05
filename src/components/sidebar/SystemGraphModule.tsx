@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Area, AreaChart, XAxis, YAxis } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { isWormholeSystem } from '@/lib/map/space';
 import type { MapSystemNode } from '@/lib/map/loadMap';
@@ -132,9 +132,6 @@ export function SystemGraphModule({ system }: { system: MapSystemNode | null }) 
 
   return (
     <Card size="sm">
-      <CardHeader>
-        <CardTitle>Activity graph</CardTitle>
-      </CardHeader>
       <CardContent className="text-xs">
         {!system ? (
           <p className="text-muted-foreground">Select a system to see activity graphs.</p>

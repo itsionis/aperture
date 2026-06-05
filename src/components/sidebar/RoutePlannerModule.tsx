@@ -12,7 +12,7 @@ import {
 import { createPortal } from 'react-dom';
 import { Loader2, Plus, Search, X } from 'lucide-react';
 import { Tooltip } from '@base-ui/react/tooltip';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -187,9 +187,6 @@ export function RoutePlannerModule({
 
   return (
     <Card size="sm">
-      <CardHeader>
-        <CardTitle>Routes</CardTitle>
-      </CardHeader>
       <CardContent className="flex flex-col gap-3 text-xs">
         {/* Source + route settings. `@container` lets the three selects share one
             row once the card is wide enough, and stack when it's narrow. */}

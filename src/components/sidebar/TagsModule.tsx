@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { TAG_STRATEGIES } from '@/lib/tagging/registry';
 import type { TagContext } from '@/lib/tagging/types';
 import type { MapViewData } from '@/lib/map/loadMap';
@@ -50,9 +50,6 @@ export function TagsModule({
 
   return (
     <Card size="sm">
-      <CardHeader>
-        <CardTitle>Next tags</CardTitle>
-      </CardHeader>
       <CardContent>
         {available.scheme === 'abc' ? (
           <ul className="flex flex-col gap-1 text-xs">

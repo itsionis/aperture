@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Building2, Pencil, Plus, Trash2 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StructureFormDialog, type StructureFormValues } from './StructureFormDialog';
 import { ccpImageUrl } from '@/lib/integrations/links';
@@ -47,15 +47,14 @@ export function StructureModule({
 
   return (
     <Card size="sm">
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle>Structures</CardTitle>
-        {system ? (
+      {system ? (
+        <CardHeader className="flex flex-row items-center justify-end">
           <Button size="xs" variant="outline" className="gap-1" onClick={openAdd}>
             <Plus className="size-3" />
             Add
           </Button>
-        ) : null}
-      </CardHeader>
+        </CardHeader>
+      ) : null}
       <CardContent className="flex flex-col gap-2 text-xs">
         {!system ? (
           <p className="text-muted-foreground">Select a system to see structures.</p>

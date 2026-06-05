@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ExternalLink, Link as LinkIcon, RefreshCw } from 'lucide-react';
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import type { MapSystemNode } from '@/lib/map/loadMap';
 import type { KillboardKill } from '@/lib/map/killboard';
@@ -85,7 +85,6 @@ export function SystemKillboardModule({ system }: { system: MapSystemNode | null
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle>Killboard</CardTitle>
         <CardAction className="flex items-center gap-1">
           <Button
             nativeButton={false}

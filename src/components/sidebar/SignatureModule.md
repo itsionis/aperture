@@ -22,7 +22,7 @@
 
 ### Renders
 A `Card` with:
-- Header row: the title (`Signatures — <system alias or name>`) and, when a system is selected, a **Lazy delete** toggle (`LazyDeleteToggle`) and a **Paste from scanner** button grouped on the right.
+- Header row (only when a system is selected): the selected system's alias/name as muted subtext on the left, and a **Lazy delete** toggle (`LazyDeleteToggle`) plus a **Paste from scanner** button grouped on the right. The panel name ("Signatures") comes from the surrounding `MapPanel` chrome — no in-card title.
 - Body: when no system is selected, a placeholder message. When a system is selected: a **filter bar** (`SignatureFilterBar`) above the table, the nine-column TanStack Table, and a draft-input row below. TTL is a forward countdown (`formatRelativeFromMs`); Created and Updated are backward "time ago" strings (`formatAgoFromMs`).
 - The **Sig**, **Group**, **Created**, and **Updated** column headers are sortable (click to sort ascending, click again to reverse, arrow indicator shows active sort). Default sort is Sig ascending. Other columns (Type, Description, Leads to, TTL, delete) are non-interactive headers.
 - The filter bar has group toggle chips (Combat / Relic / Data / Gas / Wormhole / Ore / Ghost / Unknown) and a scan-state button cycling **All → Scanned only → Unscanned only**. Both filters compose; `assignedConnectionIds` is derived from the unfiltered row list so hidden sigs still hold their connection bindings.

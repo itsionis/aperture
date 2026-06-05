@@ -1,6 +1,6 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { isWormholeSystem } from '@/lib/map/space';
 import type { MapSystemNode } from '@/lib/map/loadMap';
 import type { SystemStatsSummary } from '@/lib/map/stats';
@@ -30,9 +30,6 @@ export function KillStatsModule({
 
   return (
     <Card size="sm">
-      <CardHeader>
-        <CardTitle>Activity (24h)</CardTitle>
-      </CardHeader>
       <CardContent>
         {!system ? (
           <p className="text-xs text-muted-foreground">Select a system to see activity.</p>

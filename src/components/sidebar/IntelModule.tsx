@@ -1,7 +1,7 @@
 'use client';
 
 import { ExternalLink } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import type { MapSystemNode } from '@/lib/map/loadMap';
 import type { SystemIntelSummary } from '@/lib/map/intel';
 import { systemEffectName, type SystemEffectKey } from '@/lib/eve/systemEffects';
@@ -16,9 +16,6 @@ export function IntelModule({
 }) {
   return (
     <Card size="sm">
-      <CardHeader>
-        <CardTitle>Intel</CardTitle>
-      </CardHeader>
       <CardContent className="flex flex-col gap-3 text-xs">
         {!system ? (
           <p className="text-muted-foreground">Select a system to see intel.</p>
