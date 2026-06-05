@@ -13,6 +13,7 @@ import {
 import { Tabs, TabsList, TabsPanel, TabsTab } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { usePresenceForMap } from '@/components/map/MapPresenceContext';
+import { systemClassColor } from '@/components/map/styling';
 import type {
   MapConnectionEdge,
   MapPresenceEntry,
@@ -64,7 +65,7 @@ export function MapInfoDialog({
             <TabsTab value="summary">Summary</TabsTab>
             <TabsTab value="systems">Systems ({viewData.systems.length})</TabsTab>
             <TabsTab value="connections">Connections ({viewData.connections.length})</TabsTab>
-            <TabsTab value="users">Users ({presence.length})</TabsTab>
+            <TabsTab value="users">Pilots ({presence.length})</TabsTab>
           </TabsList>
 
           <TabsPanel value="summary">
@@ -77,7 +78,7 @@ export function MapInfoDialog({
             <ConnectionsPanel connections={viewData.connections} systemById={systemById} />
           </TabsPanel>
           <TabsPanel value="users">
-            <UsersPanel presence={presence} systemNameById={systemNameById} />
+            <PilotsPanel presence={presence} systemNameById={systemNameById} />
           </TabsPanel>
         </Tabs>
       </DialogContent>
@@ -225,7 +226,14 @@ function ConnectionsPanel({
   );
 }
 
-function UsersPanel({
+/** System class label: the `C<n>`/sec rating, falling back to trueSec then `?`. */
+function classLabel(security: string | null, trueSec: number | null): string {
+  if (security) return security;
+  if (trueSec != null) return trueSec.toFixed(1);
+  return '?';
+}
+
+function PilotsPanel({
   presence,
   systemNameById,
 }: {
@@ -244,15 +252,44 @@ function UsersPanel({
         </tr>
       </thead>
       <tbody>
-        {presence.map((p) => (
-          <tr key={p.characterId} className="border-t border-foreground/10">
-            <Td>{p.characterName}</Td>
-            <Td className="text-muted-foreground">
-              {systemNameById.get(p.systemId)?.name ?? p.systemId}
-            </Td>
-            <Td className="text-muted-foreground">{p.shipTypeName ?? '—'}</Td>
-          </tr>
-        ))}
+        {presence.map((p) => {
+          // Name + class ride the presence entry (resolved server-side, so they
+          // work even when the pilot's system isn't placed on the map). The tag
+          // is map-specific, so it comes from the placed node when there is one.
+          const tag = systemNameById.get(p.systemId)?.tag ?? null;
+          return (
+            <tr key={p.characterId} className="border-t border-foreground/10">
+              <Td>{p.characterName}</Td>
+              <Td>
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className="font-mono font-bold"
+                    style={{ color: systemClassColor(p.systemSecurity) }}
+                  >
+                    {classLabel(p.systemSecurity, p.systemTrueSec)}
+                  </span>
+                  <span>{p.systemName ?? p.systemId}</span>
+                  {tag && (
+                    <span className="rounded bg-primary/15 px-1 font-mono font-bold text-primary">
+                      {tag}
+                    </span>
+                  )}
+                </span>
+              </Td>
+              <Td className="text-muted-foreground">
+                {p.shipName ?? p.shipTypeName ?? '—'}
+                {/* Custom hull name and type both shown; the type line is omitted
+                    when the pilot never renamed the hull (ESI defaults ship_name
+                    to the type name). */}
+                {p.shipName && p.shipTypeName && p.shipName !== p.shipTypeName && (
+                  <span className="ml-1.5 text-[10px] text-muted-foreground/70">
+                    {p.shipTypeName}
+                  </span>
+                )}
+              </Td>
+            </tr>
+          );
+        })}
       </tbody>
     </ScrollTable>
   );

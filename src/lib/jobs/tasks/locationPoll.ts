@@ -2,7 +2,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { JobHelpers } from 'graphile-worker';
 import { apertureConfig } from '../../../../aperture.config';
 import { db } from '@/db/client';
-import { apCharacter, apMap, apMapCharacterTracking, universeType } from '@/db/schema';
+import { apCharacter, apMap, apMapCharacterTracking, universeSystem, universeType } from '@/db/schema';
 import {
   esiCall,
   EsiBreakerOpenError,
@@ -308,6 +308,25 @@ async function broadcastCharacterUpdate(args: BroadcastArgs): Promise<void> {
       .where(eq(universeType.id, args.shipTypeId));
     shipTypeName = row?.name ?? null;
   }
+  // Resolve the location name + class so the Map Info pilot roster can label a
+  // pilot in a system that isn't placed on the map. Null when offline / unlocated
+  // or the id disappears between SDE rebuilds.
+  let systemName: string | null = null;
+  let systemSecurity: string | null = null;
+  let systemTrueSec: number | null = null;
+  if (args.systemId !== null) {
+    const [row] = await db
+      .select({
+        name: universeSystem.name,
+        security: universeSystem.security,
+        trueSec: universeSystem.trueSec,
+      })
+      .from(universeSystem)
+      .where(eq(universeSystem.id, args.systemId));
+    systemName = row?.name ?? null;
+    systemSecurity = row?.security ?? null;
+    systemTrueSec = row?.trueSec ?? null;
+  }
   // The bus discriminates by the top-level `task` field — see `src/lib/realtime/bus.ts`.
   const envelope = JSON.stringify({
     task: 'characterUpdate',
@@ -316,6 +335,9 @@ async function broadcastCharacterUpdate(args: BroadcastArgs): Promise<void> {
       characterName: args.characterName,
       online: args.online,
       systemId: args.systemId,
+      systemName,
+      systemSecurity,
+      systemTrueSec,
       shipTypeId: args.shipTypeId,
       shipTypeName,
       shipName: args.shipName,

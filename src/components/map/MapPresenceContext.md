@@ -23,7 +23,7 @@ Hook returning the pilot list for one EVE solar-system. Returns a stable array r
 
 ### usePresenceForMap(): readonly MapPresenceEntry[]
 
-Hook returning every online + located pilot across the whole map, sorted by name. Subscribes to the store's map-wide subscriber set, so it re-renders whenever any system's slice changes. The flattened snapshot is cached on the store (rebuilt only on mutation) to satisfy `useSyncExternalStore`'s stable-reference requirement. Used by `MapInfoDialog` for the online-pilot count and the Users roster.
+Hook returning every online + located pilot across the whole map, sorted by name. Subscribes to the store's map-wide subscriber set, so it re-renders whenever any system's slice changes. The flattened snapshot is cached on the store (rebuilt only on mutation) to satisfy `useSyncExternalStore`'s stable-reference requirement. Used by `MapInfoDialog` for the online-pilot count and the Pilots roster.
 
 ### usePresenceStore(): PresenceStore | null
 

@@ -125,6 +125,12 @@ export type MapPresenceEntry = {
   characterName: string;
   /** EVE solar-system id (`universe_system.id`). */
   systemId: number;
+  /** Resolved `universe_system.name`; null if the id is unknown to the SDE. */
+  systemName: string | null;
+  /** `universe_system.security` class label (e.g. `C3`); null for k-space. */
+  systemSecurity: string | null;
+  /** `universe_system.true_sec`; null when unknown. Fallback class label for k-space. */
+  systemTrueSec: number | null;
   shipTypeId: number | null;
   shipTypeName: string | null;
   /** Pilot's custom hull name (`ap_character.last_ship_name`); null before the first online tick. */
@@ -396,10 +402,12 @@ export async function loadMapSettings(
 }
 
 /**
- * Online tracked pilots currently in a known system on this map. Joins
- * `ap_map_character_tracking` × `ap_character`, left-joins `universe_type` to
- * resolve the ship name. Filters to `last_online = true AND last_system_id IS NOT NULL`
- * — offline pilots are hidden per the presence-badge UX (see SystemNode).
+ * Online tracked pilots on this map, wherever they currently are. Joins
+ * `ap_map_character_tracking` × `ap_character`, left-joins `universe_type` for
+ * the ship name and `universe_system` for the location name + class (the pilot's
+ * system need not be placed on the map). Filters to
+ * `last_online = true AND last_system_id IS NOT NULL` — offline pilots are hidden
+ * per the presence-badge UX (see SystemNode).
  */
 export async function loadMapPresence(mapId: bigint): Promise<MapPresenceEntry[]> {
   const rows = await db
@@ -407,6 +415,9 @@ export async function loadMapPresence(mapId: bigint): Promise<MapPresenceEntry[]
       characterId: apCharacter.id,
       characterName: apCharacter.name,
       systemId: apCharacter.lastSystemId,
+      systemName: universeSystem.name,
+      systemSecurity: universeSystem.security,
+      systemTrueSec: universeSystem.trueSec,
       shipTypeId: apCharacter.lastShipTypeId,
       shipTypeName: universeType.name,
       shipName: apCharacter.lastShipName,
@@ -415,6 +426,7 @@ export async function loadMapPresence(mapId: bigint): Promise<MapPresenceEntry[]
     .from(apMapCharacterTracking)
     .innerJoin(apCharacter, eq(apCharacter.id, apMapCharacterTracking.characterId))
     .leftJoin(universeType, eq(universeType.id, apCharacter.lastShipTypeId))
+    .leftJoin(universeSystem, eq(universeSystem.id, apCharacter.lastSystemId))
     .where(
       and(
         eq(apMapCharacterTracking.mapId, mapId),
@@ -433,6 +445,9 @@ export async function loadMapPresence(mapId: bigint): Promise<MapPresenceEntry[]
       characterId: Number(r.characterId),
       characterName: r.characterName,
       systemId: r.systemId,
+      systemName: r.systemName,
+      systemSecurity: r.systemSecurity,
+      systemTrueSec: r.systemTrueSec,
       shipTypeId: r.shipTypeId,
       shipTypeName: r.shipTypeName,
       shipName: r.shipName,

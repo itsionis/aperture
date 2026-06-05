@@ -318,9 +318,12 @@ export const mapConnectionAccessLoadSchema = z.object({
  * for `shipTypeId` — null when `shipTypeId` is null or the row is missing.
  * `shipName` is the pilot's custom hull name (ESI `getCharacterShip.ship_name`,
  * cached on `ap_character.last_ship_name`) — null before the first online tick.
- * The envelope stays self-contained per the payload philosophy (see the
- * mapEventPayloadSchema preamble above) at the cost of one tiny universe_type
- * lookup per poll tick.
+ * `systemName`/`systemSecurity`/`systemTrueSec` are the resolved `universe_system`
+ * fields for `systemId`, so the Map Info pilot roster can label a pilot's location
+ * even when their system isn't placed on the map. Null when `systemId` is null or
+ * unknown to the SDE. The envelope stays self-contained per the payload philosophy
+ * (see the mapEventPayloadSchema preamble above) at the cost of two tiny SDE
+ * lookups per poll tick.
  *
  * Numbers ride the wire (JSON has no `bigint`); the EVE character id and
  * solar-system id both fit comfortably in `number.MAX_SAFE_INTEGER`.
@@ -330,6 +333,9 @@ export const characterUpdateLoadSchema = z.object({
   characterName: z.string(),
   online: z.boolean().nullable(),
   systemId: z.number().int().nullable(),
+  systemName: z.string().nullable(),
+  systemSecurity: z.string().nullable(),
+  systemTrueSec: z.number().nullable(),
   shipTypeId: z.number().int().nullable(),
   shipTypeName: z.string().nullable(),
   shipName: z.string().nullable(),

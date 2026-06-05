@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { characterUpdateLoadSchema } from '@/lib/realtime/protocol';
 
-// The presence-badge feature relies on `characterName` + `shipTypeName` +
-// `shipName` being part of the wire contract; the client renders the hover
-// panel directly off these fields without a roster join.
+// The presence-badge / pilot-roster feature relies on `characterName` +
+// `shipTypeName` + `shipName` + the resolved `system*` fields being part of the
+// wire contract; the client renders the hover panel / roster directly off these
+// fields without a roster or SDE join.
 describe('characterUpdateLoadSchema', () => {
   it('parses a complete online envelope', () => {
     const result = characterUpdateLoadSchema.safeParse({
@@ -11,6 +12,9 @@ describe('characterUpdateLoadSchema', () => {
       characterName: 'Wojtek',
       online: true,
       systemId: 30000142,
+      systemName: 'Jita',
+      systemSecurity: null,
+      systemTrueSec: 0.9,
       shipTypeId: 11176,
       shipTypeName: 'Crow',
       shipName: 'Speedy Boi',
@@ -19,12 +23,15 @@ describe('characterUpdateLoadSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('accepts an offline envelope with null shipTypeName / shipName', () => {
+  it('accepts an offline envelope with null ship / system fields', () => {
     const result = characterUpdateLoadSchema.safeParse({
       characterId: 90000001,
       characterName: 'Wojtek',
       online: false,
       systemId: 30000142,
+      systemName: null,
+      systemSecurity: null,
+      systemTrueSec: null,
       shipTypeId: null,
       shipTypeName: null,
       shipName: null,
