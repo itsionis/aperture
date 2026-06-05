@@ -1,6 +1,6 @@
 ## SignatureModule
 
-**Purpose:** Standalone full-width signatures panel rendered below the map. Renders an eight-column table (Sig / Group / Type / Description / Leads to / TTL / Created / Updated) for the selected system; placeholder when nothing is selected.
+**Purpose:** Standalone full-width signatures panel rendered below the map. Renders a sortable nine-column table (Sig / Group / Type / Description / Leads to / TTL / Created / Updated / delete) for the selected system; placeholder when nothing is selected.
 **File:** `src/components/sidebar/SignatureModule.tsx`
 
 ### Props
@@ -23,7 +23,8 @@
 ### Renders
 A `Card` with:
 - Header row: the title (`Signatures — <system alias or name>`) and, when a system is selected, a **Lazy delete** toggle (`LazyDeleteToggle`) and a **Paste from scanner** button grouped on the right.
-- Body: when no system is selected, a placeholder message. When a system is selected, an eight-column table and a draft-input row below it. TTL is a forward countdown (`formatRelativeFromMs`); Created and Updated are backward "time ago" strings (`formatAgoFromMs`).
+- Body: when no system is selected, a placeholder message. When a system is selected, a nine-column TanStack Table and a draft-input row below it. TTL is a forward countdown (`formatRelativeFromMs`); Created and Updated are backward "time ago" strings (`formatAgoFromMs`).
+- The **Sig**, **Group**, **Created**, and **Updated** column headers are sortable (click to sort ascending, click again to reverse, arrow indicator shows active sort). Default sort is Sig ascending. Other columns (Type, Description, Leads to, TTL, delete) are non-interactive headers.
 
 ### Behaviour & Interactions
 - The body re-mounts on system change (`key={system.id}`) so draft state for the add form resets cleanly when the selection changes.
@@ -51,4 +52,5 @@ A `Card` with:
 - `formatRelativeFromMs`, `formatAgoFromMs` from `@/lib/map/relativeTime`
 - `fetchWormholeTypes` from `@/lib/map/client` (target-class + jump-mass-band map for the Leads-to filter and connection-size auto-set)
 - `apertureConfig` (`SIGNATURE_DEFAULT_TTL_MS`) from `aperture.config`
+- `@tanstack/react-table` — `useReactTable`, `createColumnHelper`, `getSortedRowModel`, `flexRender` for the sortable table
 - Types: `MapConnectionEdge`, `MapEventPayload`, `MapSignature`, `MapSystemNode`, `SignatureGroupKey` from `@/types`; body types from `@/lib/map/client`

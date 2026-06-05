@@ -1,7 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ClipboardPaste, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, ClipboardPaste, Trash2 } from 'lucide-react';
+import {
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type SortingState,
+} from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -30,11 +38,36 @@ import { apertureConfig } from '../../../aperture.config';
 /**
  * Recolors the cell's control border to `destructive` so an unfilled required
  * field (group / type / leads-to) reads red at a glance — the Pathfinder cue
- * for a not-yet-fully-scanned sig. Applied to the `<td>`; targets the inner
- * select trigger or text input by their `data-slot`.
+ * for a not-yet-fully-scanned sig. Applied to the cell wrapper `<div>`; targets
+ * the inner select trigger or text input by their `data-slot`.
  */
 const MISSING_CELL =
   '[&_[data-slot=select-trigger]]:border-destructive [&_[data-slot=input]]:border-destructive';
+
+const columnHelper = createColumnHelper<MapSignature>();
+
+const colHeaderClass: Record<string, string> = {
+  sigId:       'w-24 px-2 py-1 text-left',
+  groupKey:    'w-32 px-3 py-1 text-left',
+  type:        'w-56 px-3 py-1 text-left',
+  description: 'px-3 py-1 text-left',
+  leadsTo:     'w-44 px-3 py-1 text-left',
+  ttl:         'w-16 px-1 py-1 text-left',
+  createdAt:   'w-24 px-1 py-1 text-left',
+  updatedAt:   'w-24 px-1 py-1 text-left',
+  actions:     'w-10 px-1 py-1',
+};
+
+function buildGroupChangePatch(
+  prev: MapSignature,
+  nextKey: SignatureGroupKey | null,
+): UpdateSignatureBody {
+  const patch: UpdateSignatureBody = { groupKey: nextKey, typeId: null, name: null };
+  const wasWormhole = prev.groupKey === 'wormhole';
+  const isWormhole = nextKey === 'wormhole';
+  if (wasWormhole !== isWormhole) patch.mapConnectionId = null;
+  return patch;
+}
 
 function defaultExpiry(): string {
   return new Date(Date.now() + apertureConfig.SIGNATURE_DEFAULT_TTL_MS).toISOString();
@@ -279,12 +312,168 @@ function SignaturePanelBody({
    * untouched. Fired from both the type and the "Leads to" change handlers so
    * setting either side last completes the inference.
    */
-  function syncConnectionSize(typeId: number | null, connectionId: string | null) {
-    if (typeId == null || connectionId == null) return;
-    const band = metaByTypeId.get(typeId)?.jumpMassClass ?? null;
-    if (band == null) return;
-    onConnectionPatch(connectionId, { jumpMassClass: band });
-  }
+  const syncConnectionSize = useCallback(
+    (typeId: number | null, connectionId: string | null) => {
+      if (typeId == null || connectionId == null) return;
+      const band = metaByTypeId.get(typeId)?.jumpMassClass ?? null;
+      if (band == null) return;
+      onConnectionPatch(connectionId, { jumpMassClass: band });
+    },
+    [metaByTypeId, onConnectionPatch],
+  );
+
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('sigId', {
+        header: 'Sig',
+        enableSorting: true,
+        cell: ({ row }) => (
+          <span className="px-2 py-1 font-mono text-xs">{row.original.sigId}</span>
+        ),
+      }),
+      columnHelper.accessor('groupKey', {
+        header: 'Group',
+        enableSorting: true,
+        cell: ({ row }) => {
+          const sig = row.original;
+          const groupMissing = sig.groupKey === null;
+          return (
+            <div className={`px-1 py-0.5${groupMissing ? ` ${MISSING_CELL}` : ''}`}>
+              <SignatureGroupSelect
+                value={sig.groupKey}
+                onValueChange={(nextKey) => {
+                  if (nextKey === sig.groupKey) return;
+                  onPatch(sig.id, buildGroupChangePatch(sig, nextKey));
+                }}
+              />
+            </div>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: 'type',
+        header: 'Type',
+        cell: ({ row }) => {
+          const sig = row.original;
+          const typeMissing =
+            sig.groupKey !== null &&
+            (sig.groupKey === 'wormhole' ? sig.typeId === null : !sig.name);
+          return (
+            <div className={`px-1 py-0.5${typeMissing ? ` ${MISSING_CELL}` : ''}`}>
+              <TypeCell
+                mapId={mapId}
+                system={system}
+                sig={sig}
+                onPatch={onPatch}
+                onSyncConnectionSize={syncConnectionSize}
+              />
+            </div>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: 'description',
+        header: 'Description',
+        cell: ({ row }) => {
+          const sig = row.original;
+          return (
+            <div className="px-1 py-0.5">
+              <EditableTextCell
+                value={sig.description ?? ''}
+                onCommit={(next) => onPatch(sig.id, { description: next || null })}
+                className="h-7 text-sm"
+                placeholder="—"
+              />
+            </div>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: 'leadsTo',
+        header: 'Leads to',
+        cell: ({ row }) => {
+          const sig = row.original;
+          const leadsToMissing = sig.groupKey === 'wormhole' && sig.mapConnectionId === null;
+          return (
+            <div className={`px-1 py-0.5${leadsToMissing ? ` ${MISSING_CELL}` : ''}`}>
+              <ConnectionSelect
+                system={system}
+                connections={connections}
+                systems={systems}
+                value={sig.mapConnectionId}
+                onValueChange={(next) => {
+                  onPatch(sig.id, { mapConnectionId: next });
+                  syncConnectionSize(sig.typeId, next);
+                }}
+                disabled={sig.groupKey !== 'wormhole'}
+                targetClass={
+                  sig.typeId == null ? null : metaByTypeId.get(sig.typeId)?.targetClass ?? null
+                }
+                excludeIds={assignedConnectionIds}
+              />
+            </div>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: 'ttl',
+        header: 'TTL',
+        cell: ({ row }) => (
+          <span className="px-1 py-0.5 text-xs text-muted-foreground">
+            {formatRelativeIso(row.original.expiresAt)}
+          </span>
+        ),
+      }),
+      columnHelper.accessor('createdAt', {
+        header: 'Created',
+        enableSorting: true,
+        cell: ({ row }) => (
+          <span className="px-1 py-0.5 text-xs text-muted-foreground">
+            {formatAgoIso(row.original.createdAt)}
+          </span>
+        ),
+      }),
+      columnHelper.accessor('updatedAt', {
+        header: 'Updated',
+        enableSorting: true,
+        cell: ({ row }) => (
+          <span className="px-1 py-0.5 text-xs text-muted-foreground">
+            {formatAgoIso(row.original.updatedAt)}
+          </span>
+        ),
+      }),
+      columnHelper.display({
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <div className="px-1 py-0.5 text-right">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Delete signature"
+              onClick={() => onDelete(row.original.id)}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
+        ),
+      }),
+    ],
+    [mapId, system, connections, systems, onPatch, onDelete, syncConnectionSize, metaByTypeId, assignedConnectionIds],
+  );
+
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'sigId', desc: false }]);
+
+  const table = useReactTable({
+    data: rows,
+    columns,
+    getRowId: (row) => row.id,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
 
   const [draftSigId, setDraftSigId] = useState('');
   const [draftGroupKey, setDraftGroupKey] = useState<SignatureGroupKey | null>(null);
@@ -312,130 +501,50 @@ function SignaturePanelBody({
     setDraftConnectionId(null);
   }
 
-  /**
-   * Build a Group-change patch including the cascading nulls. Always clears
-   * `typeId` and `name`; clears `mapConnectionId` when the previous row was a
-   * wormhole and the new group isn't (or vice versa, since the connection is
-   * only valid for wormhole sigs).
-   */
-  function buildGroupChangePatch(
-    prev: MapSignature,
-    nextKey: SignatureGroupKey | null,
-  ): UpdateSignatureBody {
-    const patch: UpdateSignatureBody = {
-      groupKey: nextKey,
-      typeId: null,
-      name: null,
-    };
-    const wasWormhole = prev.groupKey === 'wormhole';
-    const isWormhole = nextKey === 'wormhole';
-    if (wasWormhole !== isWormhole) patch.mapConnectionId = null;
-    return patch;
-  }
-
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-hidden rounded-md ring-1 ring-foreground/10">
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-[11px] uppercase text-muted-foreground">
-            <tr>
-              <th className="w-24 px-2 py-1 text-left">Sig</th>
-              <th className="w-32 px-3 py-1 text-left">Group</th>
-              <th className="w-56 px-3 py-1 text-left">Type</th>
-              <th className="px-3 py-1 text-left">Description</th>
-              <th className="w-44 px-3 py-1 text-left">Leads to</th>
-              <th className="w-16 px-1 py-1 text-left">TTL</th>
-              <th className="w-24 px-1 py-1 text-left">Created</th>
-              <th className="w-24 px-1 py-1 text-left">Updated</th>
-              <th className="w-10 px-1 py-1" />
-            </tr>
+            {table.getHeaderGroups().map((hg) => (
+              <tr key={hg.id}>
+                {hg.headers.map((header) => {
+                  const sortable = header.column.getCanSort();
+                  const sorted = header.column.getIsSorted();
+                  return (
+                    <th
+                      key={header.id}
+                      className={`${colHeaderClass[header.id] ?? 'px-2 py-1 text-left'}${sortable ? ' cursor-pointer select-none' : ''}`}
+                      onClick={sortable ? header.column.getToggleSortingHandler() : undefined}
+                    >
+                      <span className="inline-flex items-center gap-0.5">
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {sorted === 'asc' && <ArrowUp className="size-3" />}
+                        {sorted === 'desc' && <ArrowDown className="size-3" />}
+                      </span>
+                    </th>
+                  );
+                })}
+              </tr>
+            ))}
           </thead>
           <tbody>
-            {rows.length === 0 && (
+            {table.getRowModel().rows.length === 0 && (
               <tr>
                 <td colSpan={9} className="px-2 py-3 text-center text-xs text-muted-foreground">
                   No signatures.
                 </td>
               </tr>
             )}
-            {rows.map((sig) => {
-              // Fully scanned = sig + group + type (+ "leads to" for wormholes).
-              // Flag each still-empty required cell so it reads red on its own.
-              const groupMissing = sig.groupKey === null;
-              const typeMissing =
-                sig.groupKey !== null &&
-                (sig.groupKey === 'wormhole' ? sig.typeId === null : !sig.name);
-              const leadsToMissing =
-                sig.groupKey === 'wormhole' && sig.mapConnectionId === null;
-              return (
-              <tr key={sig.id} className="border-t border-foreground/10 align-middle">
-                <td className="px-2 py-1 font-mono text-xs">{sig.sigId}</td>
-                <td className={`px-1 py-0.5${groupMissing ? ` ${MISSING_CELL}` : ''}`}>
-                  <SignatureGroupSelect
-                    value={sig.groupKey}
-                    onValueChange={(nextKey) => {
-                      if (nextKey === sig.groupKey) return;
-                      onPatch(sig.id, buildGroupChangePatch(sig, nextKey));
-                    }}
-                  />
-                </td>
-                <td className={`px-1 py-0.5${typeMissing ? ` ${MISSING_CELL}` : ''}`}>
-                  <TypeCell
-                    mapId={mapId}
-                    system={system}
-                    sig={sig}
-                    onPatch={onPatch}
-                    onSyncConnectionSize={syncConnectionSize}
-                  />
-                </td>
-                <td className="px-1 py-0.5">
-                  <EditableTextCell
-                    value={sig.description ?? ''}
-                    onCommit={(next) => onPatch(sig.id, { description: next || null })}
-                    className="h-7 text-sm"
-                    placeholder="—"
-                  />
-                </td>
-                <td className={`px-1 py-0.5${leadsToMissing ? ` ${MISSING_CELL}` : ''}`}>
-                  <ConnectionSelect
-                    system={system}
-                    connections={connections}
-                    systems={systems}
-                    value={sig.mapConnectionId}
-                    onValueChange={(next) => {
-                      onPatch(sig.id, { mapConnectionId: next });
-                      syncConnectionSize(sig.typeId, next);
-                    }}
-                    disabled={sig.groupKey !== 'wormhole'}
-                    targetClass={
-                      sig.typeId == null ? null : metaByTypeId.get(sig.typeId)?.targetClass ?? null
-                    }
-                    excludeIds={assignedConnectionIds}
-                  />
-                </td>
-                <td className="px-1 py-0.5 text-xs text-muted-foreground">
-                  {formatRelativeIso(sig.expiresAt)}
-                </td>
-                <td className="px-1 py-0.5 text-xs text-muted-foreground">
-                  {formatAgoIso(sig.createdAt)}
-                </td>
-                <td className="px-1 py-0.5 text-xs text-muted-foreground">
-                  {formatAgoIso(sig.updatedAt)}
-                </td>
-                <td className="px-1 py-0.5 text-right">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Delete signature"
-                    onClick={() => onDelete(sig.id)}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </td>
+            {table.getRowModel().rows.map((row) => (
+              <tr key={row.id} className="border-t border-foreground/10 align-middle">
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
               </tr>
-              );
-            })}
+            ))}
           </tbody>
         </table>
       </div>
