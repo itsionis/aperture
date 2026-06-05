@@ -37,7 +37,7 @@ A trigger button (active character's portrait + name) opening a right-anchored S
 - `settingsOpen: boolean` — Account settings dialog visibility.
 - `tracking: Record<string, boolean>` — per-map tracking selection, lazy-loaded on open.
 - `mapName: string | null` — the open map's display name for the description.
-- `loadedMapId: number | null` — the map id the current `tracking` selection was fetched for; `loaded` (gate) is derived as `loadedMapId === currentMapId`.
+- `loadedMapId: string | null` — the map id the current `tracking` selection was fetched for; `loaded` (gate) is derived as `loadedMapId === currentMapId`.
 - `pending` — transition state for an in-flight toggle.
 
 ### Notes

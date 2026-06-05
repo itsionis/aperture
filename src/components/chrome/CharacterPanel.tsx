@@ -67,7 +67,7 @@ export function CharacterPanel({
   // including when the map changes while the Sheet stays open.
   const [tracking, setTracking] = useState<Record<string, boolean>>({});
   const [mapName, setMapName] = useState<string | null>(null);
-  const [loadedMapId, setLoadedMapId] = useState<number | null>(null);
+  const [loadedMapId, setLoadedMapId] = useState<string | null>(null);
   const loaded = currentMapId !== null && loadedMapId === currentMapId;
 
   // Re-gate on every open/close so a reopen always waits for a fresh fetch.
