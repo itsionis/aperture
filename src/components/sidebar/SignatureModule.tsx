@@ -11,7 +11,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { WormholeTypeSelect } from './WormholeTypeSelect';
 import { SignatureGroupSelect } from './SignatureGroupSelect';
@@ -144,10 +144,7 @@ export function SignatureModule({
   onCreate,
   onPatch,
   onDelete,
-  onBulkPaste,
   onConnectionPatch,
-  lazyDelete,
-  onLazyDeleteChange,
 }: {
   mapId: string;
   system: MapSystemNode | null;
@@ -157,29 +154,10 @@ export function SignatureModule({
   onCreate: (body: CreateSignatureBody) => void;
   onPatch: (signatureId: string, patch: UpdateSignatureBody) => void;
   onDelete: (signatureId: string) => void;
-  onBulkPaste: (payloads: MapEventPayload[]) => void;
   onConnectionPatch: (connectionId: string, patch: UpdateConnectionBody) => void;
-  lazyDelete: boolean;
-  onLazyDeleteChange: (next: boolean) => void;
 }) {
   return (
     <Card>
-      {system && (
-        <CardHeader className="flex flex-row items-center justify-between gap-2">
-          <span className="truncate text-sm text-muted-foreground">
-            {system.alias ?? system.name}
-          </span>
-          <div className="flex items-center gap-2">
-            <LazyDeleteToggle armed={lazyDelete} onArmedChange={onLazyDeleteChange} />
-            <SignaturePasteButton
-              mapId={mapId}
-              system={system}
-              signatures={signatures}
-              onBulkPaste={onBulkPaste}
-            />
-          </div>
-        </CardHeader>
-      )}
       <CardContent>
         {!system ? (
           <p className="text-xs text-muted-foreground">
@@ -201,6 +179,42 @@ export function SignatureModule({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Header actions for the Signatures panel — the **Lazy delete** arm toggle and
+ * the **Paste from scanner** button. Rendered into the `MapPanel` header
+ * (`headerRight`) rather than inside the card, so they sit beside the panel
+ * title alongside the drag handle and hide button. Renders nothing when no
+ * system is selected (there is nothing to paste into).
+ */
+export function SignatureModuleHeaderActions({
+  mapId,
+  system,
+  signatures,
+  onBulkPaste,
+  lazyDelete,
+  onLazyDeleteChange,
+}: {
+  mapId: string;
+  system: MapSystemNode | null;
+  signatures: MapSignature[];
+  onBulkPaste: (payloads: MapEventPayload[]) => void;
+  lazyDelete: boolean;
+  onLazyDeleteChange: (next: boolean) => void;
+}) {
+  if (!system) return null;
+  return (
+    <>
+      <LazyDeleteToggle armed={lazyDelete} onArmedChange={onLazyDeleteChange} />
+      <SignaturePasteButton
+        mapId={mapId}
+        system={system}
+        signatures={signatures}
+        onBulkPaste={onBulkPaste}
+      />
+    </>
   );
 }
 

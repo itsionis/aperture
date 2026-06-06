@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Background,
   ConnectionMode,
@@ -79,7 +79,10 @@ import { IntelModule } from '@/components/sidebar/IntelModule';
 import { StructureModule } from '@/components/sidebar/StructureModule';
 import type { StructureFormValues } from '@/components/sidebar/StructureFormDialog';
 import { InspectorModule, type SelectionRef } from '@/components/sidebar/InspectorModule';
-import { SignatureModule } from '@/components/sidebar/SignatureModule';
+import {
+  SignatureModule,
+  SignatureModuleHeaderActions,
+} from '@/components/sidebar/SignatureModule';
 import { Info, LayoutDashboard, Plus, RotateCcw, Settings, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -1151,10 +1154,7 @@ export function MapCanvas({
             onCreate={onSignatureCreate}
             onPatch={onSignaturePatch}
             onDelete={onSignatureDelete}
-            onBulkPaste={onBulkPaste}
             onConnectionPatch={onConnectionPatch}
-            lazyDelete={lazyDeleteSigs}
-            onLazyDeleteChange={setLazyDeleteSigs}
           />
         );
       case 'inspector':
@@ -1212,6 +1212,22 @@ export function MapCanvas({
       case 'thera':
         return <TheraModule mapId={mapId} viewData={viewData} onBulkPaste={onBulkPaste} />;
     }
+  };
+
+  const panelHeaderRight = (id: PanelId): ReactNode => {
+    if (id === 'signatures') {
+      return (
+        <SignatureModuleHeaderActions
+          mapId={mapId}
+          system={selectedSystem}
+          signatures={viewData.signatures}
+          onBulkPaste={onBulkPaste}
+          lazyDelete={lazyDeleteSigs}
+          onLazyDeleteChange={setLazyDeleteSigs}
+        />
+      );
+    }
+    return undefined;
   };
 
   return (
@@ -1295,6 +1311,7 @@ export function MapCanvas({
                   id={p.id}
                   title={p.title}
                   onHide={handleHide}
+                  headerRight={panelHeaderRight(p.id)}
                   contentClassName={
                     p.id === 'canvas' ? 'min-h-0 flex-1 overflow-hidden p-0' : undefined
                   }

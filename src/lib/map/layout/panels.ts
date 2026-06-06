@@ -23,7 +23,7 @@ export interface PanelDef {
 /** Registry of every panel, in DOM source order (drives single-column stacking). */
 export const PANELS: PanelDef[] = [
   { id: 'canvas', title: 'Map', defaultVisible: true, minW: 4, minH: 6 },
-  { id: 'signatures', title: 'Signatures', defaultVisible: true, minW: 2, minH: 3 },
+  { id: 'signatures', title: 'Signatures', defaultVisible: true, minW: 6, minH: 3 },
   { id: 'inspector', title: 'Inspector', defaultVisible: true, minW: 1, minH: 3 },
   { id: 'route', title: 'Routes', defaultVisible: true, minW: 2, minH: 2 },
   { id: 'intel', title: 'Intel', defaultVisible: true, minW: 2, minH: 2 },
