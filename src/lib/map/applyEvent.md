@@ -21,7 +21,7 @@ Dispatches on `payload.kind` and returns a new `MapViewData` without mutating th
 - `system.updated` — merges the patch into the matching system; canvas-visible fields applied: `alias`, `tag`, `status`, `locked`, `rallyAt`, `positionX`, `positionY`. `intelNotes` is not in `MapViewData` and is silently ignored.
 - `connection.create` — upserts the full edge body into `state.connections` (existence-checked by `id`, so a double-delivered event can't produce a duplicate edge / React key collision).
 - `connection.update` — merges the patch into the matching connection; `isStatic` and `eolAt` are applied when present (so the static designation and canvas EOL countdown reflect the new state without a refetch).
-- `connection.delete` — removes the connection by id.
+- `connection.delete` — removes the connection by id, and also removes any signatures whose `mapConnectionId` matches it. This mirrors the `ON DELETE CASCADE` on `ap_map_signature.map_connection_id`: the server emits only a `connection.delete` event while Postgres silently cascade-deletes the linked signature rows, so the reducer must drop them too — otherwise the client keeps an orphaned signature whose DB row is gone, and deleting it later 400s with "Signature not found."
 - `map.update` — updates `state.map.name` if present in the patch; other settings flags have no canvas representation.
 - `signature.create` — upserts the full signature body into `state.signatures`.
 - `signature.update` — merges the patch into the matching signature by id; only present keys overwrite. Includes `groupKey`, `typeId`, the display-only `wormholeCode` (resolved server-side from `universe_wormhole.name` when `typeId` changes), and `updatedAt`.

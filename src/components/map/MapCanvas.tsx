@@ -51,6 +51,7 @@ import {
   deleteDisconnectedOnServer,
   deleteSignatureOnServer,
   deleteSubchainOnServer,
+  fetchMapSnapshot,
   pingSystemOnServer,
   removeSystemOnServer,
   updateConnectionOnServer,
@@ -349,6 +350,29 @@ export function MapCanvas({
     setViewData((prev) => applyEvent(prev, payload));
   }, [lastEvent]);
 
+  // ---- On-error resync failsafe ------------------------------------------
+  //
+  // A rollback can't fix every drift — e.g. an orphaned signature whose DB row
+  // was cascade-deleted with its connection. When a mutation fails we refetch
+  // the authoritative snapshot and reset the view. Guarded by an in-flight ref
+  // so a burst of failures collapses into a single refetch; the dedupe set is
+  // cleared because the fresh snapshot is the new baseline (any racing echo
+  // re-applies idempotently via applyEvent).
+  const resyncInFlight = useRef(false);
+  const resync = useCallback(async () => {
+    if (resyncInFlight.current) return;
+    resyncInFlight.current = true;
+    try {
+      const result = await fetchMapSnapshot(data.map.id);
+      if (result.ok) {
+        appliedEventIds.current.clear();
+        setViewData(result.data);
+      }
+    } finally {
+      resyncInFlight.current = false;
+    }
+  }, [data.map.id]);
+
   // ---- Optimistic-apply helpers (PATCH/DELETE) ---------------------------
   //
   // For PATCH/DELETE we apply locally first, snapshot for rollback, and dedupe
@@ -371,10 +395,12 @@ export function MapCanvas({
       if (result.ok) {
         appliedEventIds.current.add(result.eventId);
       } else if (snapshot) {
+        // Immediate rollback for responsiveness; resync reconciles deeper drift.
         setViewData(snapshot);
+        void resync();
       }
     },
-    [],
+    [resync],
   );
 
   const awaitServer = useCallback(
@@ -384,11 +410,14 @@ export function MapCanvas({
       >,
     ) => {
       const result = await run();
-      if (!result.ok) return;
+      if (!result.ok) {
+        void resync();
+        return;
+      }
       appliedEventIds.current.add(result.eventId);
       setViewData((prev) => applyEvent(prev, result.data));
     },
-    [],
+    [resync],
   );
 
   // Apply N event payloads in commit order and register each eventId in the

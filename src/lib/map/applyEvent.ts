@@ -82,7 +82,16 @@ export function applyEvent(state: MapViewData, payload: MapEventPayload): MapVie
     }
 
     case 'connection.delete':
-      return { ...state, connections: state.connections.filter((c) => c.id !== payload.id) };
+      return {
+        ...state,
+        connections: state.connections.filter((c) => c.id !== payload.id),
+        // ap_map_signature.map_connection_id is ON DELETE CASCADE — Postgres
+        // drops these rows when the connection goes, but only a connection.delete
+        // event is emitted. Mirror the cascade so the client never keeps a
+        // signature whose DB row is gone (deleting it would 400 "Signature not
+        // found.").
+        signatures: state.signatures.filter((s) => s.mapConnectionId !== payload.id),
+      };
 
     case 'map.update': {
       if (payload.name === undefined) return state;

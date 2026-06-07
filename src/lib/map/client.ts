@@ -7,6 +7,7 @@ import type {
   ImportResult,
   MapEventPayload,
   MapExportFile,
+  MapViewData,
   ParsedSigRow,
   ResolvedSigRow,
   SignatureGroupKey,
@@ -119,6 +120,23 @@ function mutationFetch<T>(
 
 function readFetch<T>(url: string): Promise<FetchResult<T>> {
   return requestJson<FetchResult<T>>('GET', url);
+}
+
+/**
+ * Fetch the full authoritative map snapshot (`MapViewData`) for the on-error
+ * resync failsafe in `MapCanvas`. Uses a bare `fetch` rather than `readFetch`
+ * so a failed resync does NOT fire a second `toast.error` — it runs right after
+ * a mutation that already surfaced its own error, so a second toast is just noise.
+ */
+export async function fetchMapSnapshot(mapId: string): Promise<FetchResult<MapViewData>> {
+  try {
+    const res = await fetch(`/api/map/${mapId}`, { credentials: 'same-origin' });
+    const json = (await res.json().catch(() => null)) as FetchResult<MapViewData> | null;
+    if (!json) return { ok: false, error: `Request failed (${res.status}).` };
+    return json;
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Network error.' };
+  }
 }
 
 // ---------------------------------------------------------------------------
