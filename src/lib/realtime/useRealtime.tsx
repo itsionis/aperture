@@ -169,3 +169,31 @@ export function useRealtimeEvents(listener: (env: Envelope) => void): void {
   });
   useEffect(() => subscribeToEvents((env) => ref.current(env)), [subscribeToEvents]);
 }
+
+/**
+ * Fire `onReconnect` when the socket returns to `open` after having been
+ * disconnected — NOT on the initial mount-open (the page-load snapshot is
+ * already fresh, so there is nothing to recover). A real drop passes through
+ * `degraded`/`closed` before re-opening, which arms the resync; `connecting` is
+ * the pre-open state and is ignored so the initial `connecting → open` can never
+ * trigger a fetch. Closes the reconnect-backfill gap: the SharedWorker resumes
+ * only NEW events on reconnect, so the canvas must refetch to recover the gap.
+ */
+export function useReconnectResync(onReconnect: () => void): void {
+  const { status } = useRealtime();
+  const wasDisconnectedRef = useRef(false);
+  const ref = useRef(onReconnect);
+  // Keep the latest callback without re-running the transition effect — the
+  // effect depends on `status` only (same ref pattern as `useRealtimeEvents`).
+  useEffect(() => {
+    ref.current = onReconnect;
+  });
+  useEffect(() => {
+    if (status === 'degraded' || status === 'closed') {
+      wasDisconnectedRef.current = true;
+    } else if (status === 'open' && wasDisconnectedRef.current) {
+      wasDisconnectedRef.current = false;
+      ref.current();
+    }
+  }, [status]);
+}

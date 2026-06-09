@@ -69,7 +69,7 @@ import {
   updateStructureOnServer,
 } from '@/lib/structures/client';
 import { mapUpdateLoadSchema, type Envelope } from '@/lib/realtime/protocol';
-import { useMapSubscription, useRealtimeEvents } from '@/lib/realtime/useRealtime';
+import { useMapSubscription, useRealtimeEvents, useReconnectResync } from '@/lib/realtime/useRealtime';
 import { RoutePlannerModule } from '@/components/sidebar/RoutePlannerModule';
 import { KillStatsModule } from '@/components/sidebar/KillStatsModule';
 import { SystemGraphModule } from '@/components/sidebar/SystemGraphModule';
@@ -376,6 +376,12 @@ export function MapCanvas({
       resyncInFlight.current = false;
     }
   }, [data.map.id]);
+
+  // On a socket reconnect (open after a degraded/closed gap), the SharedWorker
+  // resumes only NEW events — anything committed during the disconnect is lost.
+  // Refetch the authoritative snapshot so the canvas converges to DB truth. The
+  // initial mount-open does not fire (page-load snapshot is already fresh).
+  useReconnectResync(resync);
 
   // ---- Optimistic-apply helpers (PATCH/DELETE) ---------------------------
   //

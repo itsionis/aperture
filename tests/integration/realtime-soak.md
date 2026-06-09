@@ -14,10 +14,10 @@ N **actors** fire concurrent position commits on **overlapping** systems (genuin
 ### Assertions
 1. **Convergence** — each observer, folding received `system.updated` deltas in arrival order (last-write-wins), lands on the same final position per system as the authoritative `ap_map_system` row. Holds because pg NOTIFY delivers in commit order and the row's final value is set by the last committer.
 2. **No transport drop** — each observer's received event-id set equals the committed `system.updated` id set for the burst window (server→socket fidelity under load).
-3. **Reconnect gap** — an observer whose socket drops mid-burst receives NONE of the events committed while disconnected after it reconnects. This *documents* the missing "since eventId" backfill; flip the expectation to assert recovery once backfill lands.
+3. **Reconnect gap** — an observer whose socket drops mid-burst receives NONE of the events committed while disconnected after it reconnects. This *documents* that the **transport** has no backfill (true by design — the WS resumes only new events). End-to-end client recovery is now handled one layer up: on reconnect `MapCanvas` refetches the authoritative snapshot via `useReconnectResync` → `resync()`, proven by `tests/unit/realtime-reconnect.test.tsx`. This soak assertion stays as the transport-layer record; it is not flipped.
 
 ### Scope / caveats
-- Tests the **server→socket transport**. The separate client-layer risk — the React provider's single-slot `lastEvent` coalescing rapid bursts (`src/lib/realtime/useRealtime.tsx`) — sits above the socket and needs a jsdom provider-level test; raw `ws` does not coalesce.
+- Tests the **server→socket transport**. The two client-layer risks sit above the socket and are covered by jsdom provider-level tests, not here: burst coalescing → `tests/unit/realtime-delivery.test.tsx`; reconnect recovery → `tests/unit/realtime-reconnect.test.tsx`.
 - Mock characters are seeded `authz_level='admin'` so the soak measures sync, not authorization (admin overrides view/mutate in `src/lib/auth/rights.ts`).
 
 ### Running

@@ -20,6 +20,9 @@ Context accessor; throws outside a `RealtimeProvider`. `status: RealtimeStatus`;
 #### `useRealtimeEvents(listener: (env: Envelope) => void): void`
 Runs `listener` for every inbound envelope, exactly once each, in arrival order — including same-tick bursts a `useState` slot would coalesce. The listener may change every render without re-subscribing (held in a ref, updated in an effect); the underlying subscription is stable for the component's lifetime. The canonical way every consumer (`MapCanvas`, `MapPresenceContext`, `MapUnderglowBridge`, `ConnectionMassLog`) reads realtime events: each filters on `envelope.task` and folds the validated load into its own state/store.
 
+#### `useReconnectResync(onReconnect: () => void): void`
+Fires `onReconnect` when the socket returns to `open` **after** a disconnect (`degraded`/`closed`), recovering events the SharedWorker dropped during the gap (it resumes only NEW events on reconnect). Does **not** fire on the initial mount-open — the page-load snapshot is already fresh — because the provider starts at `connecting` and only `degraded`/`closed` arm the resync; `connecting` is ignored. `onReconnect` is held in a ref so a changing callback identity doesn't re-run the transition effect (which depends on `status` only). `MapCanvas` passes its existing `resync()` (snapshot refetch + dedupe-set reset).
+
 #### `useMapSubscription(mapId: number | null): void`
 Subscribes to one map for the calling component's lifetime; unsubscribes on unmount.
 
@@ -31,3 +34,4 @@ Subscribes to one map for the calling component's lifetime; unsubscribes on unmo
 
 ### Tested by
 - `tests/unit/realtime-delivery.test.tsx` — proves a same-tick burst of N frames reaches a `useRealtimeEvents` consumer all N times in order, and that delivery stops after the consumer unmounts.
+- `tests/unit/realtime-reconnect.test.tsx` — proves `useReconnectResync` fires on `open` only after a `degraded`/`closed` gap, not on the initial mount-open, and re-arms for each subsequent disconnect.

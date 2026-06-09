@@ -30,7 +30,8 @@ A free-form dashboard (the page scrolls). A full-width toolbar row sits above a 
 - `appliedEventIds` ref dedupes the initiating tab's own realtime echo by `eventId`.
 - `runOptimistic(optimisticPayload, run)` snapshots `viewData`, applies the payload through `applyEvent` locally, fires the network call, and either records the returned `eventId` (success) or restores the snapshot **and triggers `resync()`** (failure). Used for PATCH / DELETE.
 - `awaitServer(run)` posts and, on success, applies the server's `MapEventPayload` through `applyEvent` and records its `eventId`; on failure it triggers `resync()`. Used for POST.
-- `resync()` — on-error self-heal failsafe. Refetches the authoritative snapshot via `fetchMapSnapshot(data.map.id)` (GET `/api/map/{mapId}`), clears `appliedEventIds`, and replaces `viewData`. Guarded by a `resyncInFlight` ref so a burst of failures collapses into one refetch. A rollback alone can't fix every drift — e.g. a signature orphaned on the client after its connection (and the DB row, via `ON DELETE CASCADE`) was deleted; resync reconciles against DB truth. (Scoped to mutation-failure only; not wired to realtime reconnect.)
+- `resync()` — self-heal failsafe. Refetches the authoritative snapshot via `fetchMapSnapshot(data.map.id)` (GET `/api/map/{mapId}`), clears `appliedEventIds`, and replaces `viewData`. Guarded by a `resyncInFlight` ref so a burst of triggers collapses into one refetch. A rollback alone can't fix every drift — e.g. a signature orphaned on the client after its connection (and the DB row, via `ON DELETE CASCADE`) was deleted; resync reconciles against DB truth. Triggered on **mutation failure** (rollback can't recover) **and on socket reconnect** (see below).
+- `useReconnectResync(resync)` — calls `resync()` when the realtime socket reopens after a `degraded`/`closed` gap, recovering events committed during the disconnect (the SharedWorker resumes only NEW events on reconnect). Does **not** fire on the initial mount-open — the page-load snapshot is already fresh. The `resyncInFlight` guard means a reconnect during an in-flight error-resync collapses safely.
 - `onBulkPaste(payloads)` loops the N committed payloads, registers every `eventId` in `appliedEventIds`, and folds each through `applyEvent` in commit order — the bulk equivalent of `awaitServer`. Shared by signature paste, import, Thera sync, subchain delete, **and manual add** (the add returns the new system + its auto gate links). Defined just after `awaitServer` so the earlier `onAddSystem` can depend on it.
 - Nodes are managed in xyflow's "controlled" pattern: `nodes` is a `useState`, and `onNodesChange` applies xyflow's `NodeChange[]` through `applyNodeChanges`. This is what makes drag visually smooth — without an `onNodesChange` handler, xyflow's drag/position events have nowhere to land and nodes don't move until release. A render-time sync block (keyed on `{ systems, selectedSystemIds }`, both compared by reference — every selection mutation makes a fresh `Set`) syncs `viewData.systems` + per-node `selected: selectedSystemIds.has(s.id)` + `onAliasOrTagCommit` into the nodes state, preserving each node's `dragging` position and xyflow-internal fields (`measured`, etc.) by spreading the existing entry — without that, every sync would re-measure and nodes would flicker out.
 - Scroll wheel: `zoomOnScroll={false}` and `preventScrolling={false}` — the wheel does not zoom the canvas; native browser scroll propagates to the page, scrolling down to the signature panel.
@@ -61,7 +62,7 @@ A free-form dashboard (the page scrolls). A full-width toolbar row sits above a 
 
 ### Emits / Calls
 - `onNodesChange` — xyflow callback; applies `NodeChange[]` to the nodes state via `applyNodeChanges`.
-- `useMapSubscription` / `useRealtimeEvents` — subscribe to the map channel + consume live `mapUpdate` envelopes (every envelope delivered once, no coalescing).
+- `useMapSubscription` / `useRealtimeEvents` / `useReconnectResync` — subscribe to the map channel + consume live `mapUpdate` envelopes (every envelope delivered once, no coalescing) + refetch the snapshot on socket reconnect.
 - `applyEvent` — pure reducer applied for every event and every optimistic patch.
 - `@/lib/map/client` — all the mutation wrappers (system / connection / signature / subchain / disconnected) + `fetchWormholeTypes` (via the inspector) + `fetchMapSnapshot` (via the `resync()` failsafe).
 
@@ -92,7 +93,7 @@ A free-form dashboard (the page scrolls). A full-width toolbar row sits above a 
 - `applyEvent` (`@/lib/map/applyEvent`)
 - `@/lib/map/placement` — `GRID_SIZE`, `findOpenPosition`, `overlaps`, `snapToGrid` (aliased `snapPointToGrid` to avoid clashing with the ReactFlow `snapToGrid` prop) for manual-add anchoring, drag nudge, and live grid snap.
 - `mapUpdateLoadSchema`, `Envelope` (`@/lib/realtime/protocol`)
-- `useMapSubscription`, `useRealtimeEvents` (`@/lib/realtime/useRealtime`)
+- `useMapSubscription`, `useRealtimeEvents`, `useReconnectResync` (`@/lib/realtime/useRealtime`)
 - All mutation wrappers in `@/lib/map/client`
 
 ### Local State
