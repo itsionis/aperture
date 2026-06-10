@@ -690,16 +690,25 @@ export function MapCanvas({
   // input is unfocused) must never wipe systems off the map. Loops the existing
   // single-item DELETE endpoint (the onBulkPaste precedent: small, hand-selected
   // groups need no batch endpoint).
+  // The Home system and any locked systems are protected from group delete: the
+  // server rejects deleting them anyway (Home with a toast, locked outright), so
+  // exempting them here avoids the visual delete-then-reappear flicker. Drives
+  // both the "Remove N" count and the delete loop.
+  const deletableSelectedSystemIds = useMemo(() => {
+    const homeId = viewData.map.homeMapSystemId;
+    const locked = new Set(viewData.systems.filter((s) => s.locked).map((s) => s.id));
+    return [...selectedSystemIds].filter((id) => id !== homeId && !locked.has(id));
+  }, [selectedSystemIds, viewData.map.homeMapSystemId, viewData.systems]);
+
   const removeSelectedSystems = useCallback(() => {
-    if (selectedSystemIds.size === 0) return;
-    for (const id of selectedSystemIds) {
+    for (const id of deletableSelectedSystemIds) {
       runOptimistic({ kind: 'system.removed', eventId: 0, id }, () =>
         removeSystemOnServer({ mapId, mapSystemId: id }),
       );
     }
     setSelected(null);
     setSelectedSystemIds(new Set());
-  }, [mapId, runOptimistic, selectedSystemIds]);
+  }, [mapId, runOptimistic, deletableSelectedSystemIds]);
 
   const onConnectionPatch = useCallback(
     (connectionId: string, patch: UpdateConnectionBody) => {
@@ -1076,17 +1085,20 @@ export function MapCanvas({
             ref={flowWrapperRef}
             className="relative h-full overflow-hidden rounded-lg ring-1 ring-foreground/10"
           >
-            {selectedSystemIds.size > 1 && !subchainPreview && !disconnectedPreview && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={removeSelectedSystems}
-                className="nodrag nopan absolute right-2 top-2 z-10"
-              >
-                <Trash2 />
-                Remove {selectedSystemIds.size}
-              </Button>
-            )}
+            {selectedSystemIds.size > 1 &&
+              deletableSelectedSystemIds.length > 0 &&
+              !subchainPreview &&
+              !disconnectedPreview && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={removeSelectedSystems}
+                  className="nodrag nopan absolute right-2 top-2 z-10"
+                >
+                  <Trash2 />
+                  Remove {deletableSelectedSystemIds.length}
+                </Button>
+              )}
             <TransitSignaturePrompt
               mapId={mapId}
               systems={viewData.systems}
