@@ -92,7 +92,7 @@
     --card-foreground: oklch(0.985 0 0);
     /* Map tile surface: lighter than --card so nodes sit gentler on the eye
        against the dark canvas. */
-    --map-node: oklch(0.255 0 0);
+    --map-node: oklch(0.285 0 0);
     --popover: oklch(0.205 0 0);
     --popover-foreground: oklch(0.985 0 0);
     --primary: oklch(0.922 0 0);
@@ -163,6 +163,12 @@
    is a separate element and stays visible. See MapCanvas.tsx. */
 .react-flow__nodesselection {
   display: none;
+}
+
+/* Canvas pane surface. xyflow's dark colorMode defaults the pane to ~#141414;
+   nudge it lighter so the map reads a touch softer behind the nodes. */
+.react-flow {
+  --xy-background-color: oklch(0.215 0 0);
 }
 
 /* react-grid-layout (map dashboard) theming. RGL's stock stylesheet draws a

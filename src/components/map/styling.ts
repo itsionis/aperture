@@ -13,8 +13,8 @@ const SYSTEM_CLASS_COLORS: Partial<Record<string, string>> = {
   '0.0': '#dc2626', // null-sec — firetruck red
   P: '#9f1239',    // Pochven — deep red with purple
   A: '#2dd4bf',    // Abyssal — teal
-  C1: '#38bdf8',
-  C2: '#06b6d4',
+  C1: '#38c2f8',
+  C2: '#0698ec',
   C3: '#9ab910',
   C4: '#eab308',
   C5: '#f97316',

@@ -127,7 +127,7 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
             stacked so they read at a glance when zoomed out. */}
         <div className="flex flex-col items-center justify-center gap-0.5 border-r border-foreground/10 px-1.5 leading-none">
           <span
-            className="font-mono text-lg font-bold leading-none"
+            className="font-mono text-sm font-bold leading-none"
             style={{ color: systemClassColor(data.security) }}
           >
             {securityLabel(data)}
@@ -139,14 +139,14 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
               ariaLabel="Tag"
               maxLength={50}
               onCommit={(next) => onAliasOrTagCommit(data.id, 'tag', next)}
-              className="font-mono text-sm font-bold leading-none empty:hidden"
+              className="font-mono text-lg font-bold leading-none empty:hidden"
               style={{ color: systemClassColor(data.security) }}
               inputClassName="w-12"
             />
           ) : (
             data.tag && (
               <span
-                className="font-mono text-sm font-bold leading-none"
+                className="font-mono text-lg font-bold leading-none"
                 style={{ color: systemClassColor(data.security) }}
               >
                 {data.tag}
