@@ -95,6 +95,9 @@ export class PresenceStore {
       const entry: MapPresenceEntry = {
         characterId: load.characterId,
         characterName: load.characterName,
+        userId: load.userId,
+        mainCharacterId: load.mainCharacterId,
+        mainCharacterName: load.mainCharacterName,
         systemId: load.systemId,
         systemName: load.systemName,
         systemSecurity: load.systemSecurity,

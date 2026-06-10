@@ -7,6 +7,9 @@ function entry(characterId: number, systemId: number): MapPresenceEntry {
   return {
     characterId,
     characterName: `Pilot ${characterId}`,
+    userId: characterId,
+    mainCharacterId: characterId,
+    mainCharacterName: `Pilot ${characterId}`,
     systemId,
     systemName: null,
     systemSecurity: null,
@@ -22,6 +25,9 @@ function update(characterId: number, online: boolean, systemId: number | null): 
   return {
     characterId,
     characterName: `Pilot ${characterId}`,
+    userId: characterId,
+    mainCharacterId: characterId,
+    mainCharacterName: `Pilot ${characterId}`,
     online,
     systemId,
     systemName: null,

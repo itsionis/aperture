@@ -15,7 +15,7 @@ Wraps the canvas subtree. Owns one `PresenceStore` instance.
 | initial | MapPresenceEntry[] | yes | The server-loaded initial roster from `loadMapPresence` (via `MapViewData.presence`). |
 | children | ReactNode | yes | The canvas subtree. |
 
-The provider seeds the store synchronously inside `useState`'s init so the first paint already shows badges; an effect re-seeds when the `initial` reference actually changes (e.g. soft navigation back to this map). It also registers a `useRealtimeEvents` listener and calls `store.apply()` for every parsed `characterUpdate` envelope — every envelope is delivered exactly once (no `lastEvent` coalescing), so a burst of presence updates in one tick all fold in rather than dropping to the last.
+The provider seeds the store synchronously inside `useState`'s init so the first paint already shows badges; an effect re-seeds when the `initial` reference actually changes (e.g. soft navigation back to this map). It also registers a `useRealtimeEvents` listener and calls `store.apply()` for every parsed `characterUpdate` envelope — every envelope is delivered exactly once (no `lastEvent` coalescing), so a burst of presence updates in one tick all fold in rather than dropping to the last. `apply()` copies the account/main identity (`userId`/`mainCharacterId`/`mainCharacterName`) from the load onto the rebuilt entry, so the roster keeps grouping alts under their main across live moves.
 
 ### usePresenceForSystem(systemId: number): readonly MapPresenceEntry[]
 

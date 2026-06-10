@@ -10,7 +10,7 @@
 | viewData | MapViewData | yes | The canvas's live map data; used to build the `systemId → node` tag map. |
 
 ### Renders
-A ghost `Button` (`Users` icon, `Pilots (n)` with the live online count) that toggles a `Popover` containing `<PilotRoster>`.
+A ghost `Button` (`Users` icon, `Pilots (n)` with the live online count) that toggles a `Popover` containing `<PilotRoster>`. The roster popover owns its own sort / filter / group-by-main controls (see `PilotRoster.md`); this button just supplies presence, the tag map, and `viewerIds`.
 
 ### Behaviour & Interactions
 - Reads the roster from `usePresenceForMap()` (context) — **must render inside `MapPresenceProvider`**. The count and table track realtime `characterUpdate` movement while mounted.

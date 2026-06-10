@@ -1,8 +1,16 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { JobHelpers } from 'graphile-worker';
 import { apertureConfig } from '../../../../aperture.config';
 import { db } from '@/db/client';
-import { apCharacter, apMap, apMapCharacterTracking, universeSystem, universeType } from '@/db/schema';
+import {
+  apCharacter,
+  apMap,
+  apMapCharacterTracking,
+  apUser,
+  universeSystem,
+  universeType,
+} from '@/db/schema';
 import {
   esiCall,
   EsiBreakerOpenError,
@@ -103,16 +111,24 @@ async function poll(payload: LocationPollPayload, helpers: JobHelpers): Promise<
   // character from continuing to consume their token bucket; `lastShipTypeId`
   // and `lastLocationAt` are read so the offline-branch broadcast can carry
   // the breadcrumb even when the offline tick itself doesn't refresh location.
+  // Self-join ap_character to resolve the account's main name (ap_user.main_character_id)
+  // so every characterUpdate broadcast can carry the pilot's account + main identity.
+  const mainCharacter = alias(apCharacter, 'main_character');
   const [character] = await db
     .select({
       name: apCharacter.name,
       status: apCharacter.status,
+      userId: apCharacter.userId,
+      mainCharacterId: apUser.mainCharacterId,
+      mainCharacterName: mainCharacter.name,
       lastSystemId: apCharacter.lastSystemId,
       lastShipTypeId: apCharacter.lastShipTypeId,
       lastShipName: apCharacter.lastShipName,
       lastLocationAt: apCharacter.lastLocationAt,
     })
     .from(apCharacter)
+    .innerJoin(apUser, eq(apUser.id, apCharacter.userId))
+    .leftJoin(mainCharacter, eq(mainCharacter.id, apUser.mainCharacterId))
     .where(eq(apCharacter.id, characterId));
   if (!character) {
     return { stopped: 'character-missing' };
@@ -145,6 +161,9 @@ async function poll(payload: LocationPollPayload, helpers: JobHelpers): Promise<
         trackedMapIds,
         characterId,
         characterName: character.name,
+        userId: character.userId,
+        mainCharacterId: character.mainCharacterId,
+        mainCharacterName: character.mainCharacterName,
         online: false,
         systemId: character.lastSystemId,
         shipTypeId: character.lastShipTypeId,
@@ -229,6 +248,9 @@ async function poll(payload: LocationPollPayload, helpers: JobHelpers): Promise<
       trackedMapIds,
       characterId,
       characterName: character.name,
+      userId: character.userId,
+      mainCharacterId: character.mainCharacterId,
+      mainCharacterName: character.mainCharacterName,
       online: true,
       systemId: location.solar_system_id,
       shipTypeId: ship.ship_type_id,
@@ -288,6 +310,9 @@ interface BroadcastArgs {
   trackedMapIds: bigint[];
   characterId: bigint;
   characterName: string;
+  userId: number;
+  mainCharacterId: bigint | null;
+  mainCharacterName: string | null;
   online: boolean;
   systemId: number | null;
   shipTypeId: number | null;
@@ -333,6 +358,9 @@ async function broadcastCharacterUpdate(args: BroadcastArgs): Promise<void> {
     load: {
       characterId: Number(args.characterId),
       characterName: args.characterName,
+      userId: args.userId,
+      mainCharacterId: args.mainCharacterId === null ? null : Number(args.mainCharacterId),
+      mainCharacterName: args.mainCharacterName,
       online: args.online,
       systemId: args.systemId,
       systemName,

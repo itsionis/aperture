@@ -238,10 +238,14 @@ describe.skipIf(!run)('Stage 12.3 location-poll lifecycle (real Postgres)', () =
     expect(last.load).toMatchObject({
       characterId: Number(CHAR_ID),
       characterName: 'Lifecycle Test',
+      userId,
       online: true,
       systemId: TARGET,
       shipTypeId: SHIP_TYPE,
     });
+    // No main is set on this account, so both main fields ride the wire as null.
+    expect(last.load.mainCharacterId).toBeNull();
+    expect(last.load.mainCharacterName).toBeNull();
     expect(typeof last.load.locationAt).toBe('string');
     // shipTypeName is null when the SDE row for SHIP_TYPE isn't present in the
     // test DB; otherwise it's the resolved `universe_type.name`. Either way it

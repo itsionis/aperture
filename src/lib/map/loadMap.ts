@@ -1,5 +1,6 @@
 import 'server-only';
 import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { db } from '@/db/client';
 import {
   apCharacter,
@@ -8,6 +9,7 @@ import {
   apMapConnection,
   apMapSignature,
   apMapSystem,
+  apUser,
   connectionScope,
   eolStage,
   mapScope,
@@ -130,6 +132,12 @@ export type MapSignature = {
 export type MapPresenceEntry = {
   characterId: number;
   characterName: string;
+  /** Account id (`ap_user.id`); the grouping key for "group alts under main". */
+  userId: number;
+  /** The account's main character (`ap_user.main_character_id`); null if unset. */
+  mainCharacterId: number | null;
+  /** The main's name, for labeling a group whose main is offline; null if no main is set. */
+  mainCharacterName: string | null;
   /** EVE solar-system id (`universe_system.id`). */
   systemId: number;
   /** Resolved `universe_system.name`; null if the id is unknown to the SDE. */
@@ -426,10 +434,16 @@ export async function loadMapSettings(
  * per the presence-badge UX (see SystemNode).
  */
 export async function loadMapPresence(mapId: bigint): Promise<MapPresenceEntry[]> {
+  // Self-join on ap_character to resolve the account's main character name from
+  // ap_user.main_character_id (so the roster can label an alt's owner).
+  const mainCharacter = alias(apCharacter, 'main_character');
   const rows = await db
     .select({
       characterId: apCharacter.id,
       characterName: apCharacter.name,
+      userId: apCharacter.userId,
+      mainCharacterId: apUser.mainCharacterId,
+      mainCharacterName: mainCharacter.name,
       systemId: apCharacter.lastSystemId,
       systemName: universeSystem.name,
       systemSecurity: universeSystem.security,
@@ -441,6 +455,8 @@ export async function loadMapPresence(mapId: bigint): Promise<MapPresenceEntry[]
     })
     .from(apMapCharacterTracking)
     .innerJoin(apCharacter, eq(apCharacter.id, apMapCharacterTracking.characterId))
+    .innerJoin(apUser, eq(apUser.id, apCharacter.userId))
+    .leftJoin(mainCharacter, eq(mainCharacter.id, apUser.mainCharacterId))
     .leftJoin(universeType, eq(universeType.id, apCharacter.lastShipTypeId))
     .leftJoin(universeSystem, eq(universeSystem.id, apCharacter.lastSystemId))
     .where(
@@ -460,6 +476,9 @@ export async function loadMapPresence(mapId: bigint): Promise<MapPresenceEntry[]
     return [{
       characterId: Number(r.characterId),
       characterName: r.characterName,
+      userId: r.userId,
+      mainCharacterId: r.mainCharacterId === null ? null : Number(r.mainCharacterId),
+      mainCharacterName: r.mainCharacterName,
       systemId: r.systemId,
       systemName: r.systemName,
       systemSecurity: r.systemSecurity,

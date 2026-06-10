@@ -315,7 +315,10 @@ export const mapConnectionAccessLoadSchema = z.object({
  * the first completed tick.
  *
  * `characterName` rides every envelope so the client never needs a roster
- * lookup to render the breadcrumb. `shipTypeName` is the resolved `universe_type.name`
+ * lookup to render the breadcrumb. `userId`/`mainCharacterId`/`mainCharacterName`
+ * carry the pilot's account + main identity so the roster can keep grouping alts
+ * under their main across live moves (both main fields null when no main is set).
+ * `shipTypeName` is the resolved `universe_type.name`
  * for `shipTypeId` — null when `shipTypeId` is null or the row is missing.
  * `shipName` is the pilot's custom hull name (ESI `getCharacterShip.ship_name`,
  * cached on `ap_character.last_ship_name`) — null before the first online tick.
@@ -332,6 +335,9 @@ export const mapConnectionAccessLoadSchema = z.object({
 export const characterUpdateLoadSchema = z.object({
   characterId: z.number().int().positive(),
   characterName: z.string(),
+  userId: z.number().int().positive(),
+  mainCharacterId: z.number().int().nullable(),
+  mainCharacterName: z.string().nullable(),
   online: z.boolean().nullable(),
   systemId: z.number().int().nullable(),
   systemName: z.string().nullable(),
