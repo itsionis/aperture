@@ -32,7 +32,16 @@ function SelectTrigger({ className, children, ...props }: SelectPrimitive.Trigge
 function SelectContent({ className, children, ...props }: SelectPrimitive.Popup.Props) {
   return (
     <SelectPrimitive.Portal>
-      <SelectPrimitive.Positioner sideOffset={4} className="z-50 outline-none">
+      <SelectPrimitive.Positioner
+        // Anchor below the trigger with viewport-aware flipping instead of
+        // overlaying the selected item on the trigger (base-ui's default). The
+        // align-to-trigger mode pushes long lists off the top of the screen with
+        // no way to scroll up, and drives scrolling through scroll-arrows rather
+        // than ordinary overflow — which feels unresponsive to the wheel.
+        alignItemWithTrigger={false}
+        sideOffset={4}
+        className="z-50 outline-none"
+      >
         <SelectPrimitive.Popup
           data-slot="select-content"
           className={cn(

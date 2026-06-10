@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '@/db/client';
 import {
   universeDogmaAttribute,
@@ -39,25 +39,31 @@ export function jumpMassBand(kg: number | null): WhJumpMass | null {
  *   1. class-filtered WH-type suggestion when marking a signature as a wormhole;
  *   2. "mark as static" — identifying which of a system's statics a connection is.
  *
- * Class join key: `universe_system.security` (the C1–C6 / HS / LS / NS labels),
+ * Class join key: `universe_system.security` (the C1–C6 / H / L / 0.0 labels),
  * NOT `universe_system.security_class`. `universe_wormhole`'s
- * `source_class`/`target_class` use the same labels as `universe_system.security`,
+ * `source_classes`/`target_class` use the same labels as `universe_system.security`,
  * and the seeded catalog uses exactly those (e.g. a C3 static carries
- * `source_class = 'C3'`). `security_class` is the unrelated SDE ore-spawn field.
+ * `source_classes = {'C3'}`). `security_class` is the unrelated SDE ore-spawn field.
  */
 
 export type WormholeTypeOption = {
   typeId: number;
   /** WH code, e.g. `A239`, `K162`. */
   name: string;
-  /** Class it can appear in; null = any (the universal K162 reverse-exit). */
-  sourceClass: string | null;
+  /** Classes it can spawn in; null = source unspecified (K162 + Drifter/shattered-access holes). */
+  sourceClasses: string[] | null;
   /** Class it leads into; null = resolved from the far side. */
   targetClass: string | null;
   /** Inferred per-jump size band from `wormholeMaxJumpMass`; null = unknown (e.g. K162). */
   jumpMassClass: WhJumpMass | null;
   /** True when this type is one of the host system's statics (anoik.is). */
   isStatic: boolean;
+  /**
+   * True when this hole plausibly spawns in the host system: its source set is
+   * null (appears anywhere), contains the system's class, or it is one of the
+   * system's statics. Drives the dropdown's default vs. "show all" split.
+   */
+  matchesClass: boolean;
 };
 
 export type StaticMatch = {
@@ -68,11 +74,13 @@ export type StaticMatch = {
 };
 
 /**
- * Wormhole types that can appear in a given system, for the WH-type dropdown.
- * Returns every catalog row whose `source_class` is null (appears anywhere —
- * includes the universal `K162`) or equals the system's class label, ordered by
- * code. Each row is tagged `isStatic` when it's one of the system's statics, so
- * the dropdown can pin those to the top. An unknown `systemId` yields `[]`.
+ * The full wormhole catalog, annotated for a given system's WH-type dropdown.
+ * Returns every catalog row ordered by code, each tagged with `isStatic` (one of
+ * the system's statics, pinned to the top) and `matchesClass` (plausibly spawns
+ * here — null source, source set contains the system's class, or it's a static).
+ * The dropdown shows matches by default and the rest behind "show all"; the
+ * static clause keeps a shattered system's odd-class statics from being hidden.
+ * An unknown `systemId` yields `[]`.
  */
 export async function wormholeTypesForSystem(systemId: number): Promise<WormholeTypeOption[]> {
   const [system] = await db
@@ -87,13 +95,10 @@ export async function wormholeTypesForSystem(systemId: number): Promise<Wormhole
     .where(eq(universeSystemStatic.systemId, systemId));
   const staticTypeIds = new Set(staticRows.map((r) => r.typeId));
 
-  const where =
-    system.security == null
-      ? isNull(universeWormhole.sourceClass)
-      : or(
-          isNull(universeWormhole.sourceClass),
-          eq(universeWormhole.sourceClass, system.security),
-        );
+  const matches = (typeId: number, sourceClasses: string[] | null): boolean =>
+    sourceClasses == null ||
+    (system.security != null && sourceClasses.includes(system.security)) ||
+    staticTypeIds.has(typeId);
 
   // The jump-mass band is derived from the `wormholeMaxJumpMass` dogma value,
   // read through the effective view (so any override is honoured). Resolve the
@@ -109,16 +114,16 @@ export async function wormholeTypesForSystem(systemId: number): Promise<Wormhole
       .select({
         typeId: universeWormhole.typeId,
         name: universeWormhole.name,
-        sourceClass: universeWormhole.sourceClass,
+        sourceClasses: universeWormhole.sourceClasses,
         targetClass: universeWormhole.targetClass,
       })
       .from(universeWormhole)
-      .where(where)
       .orderBy(universeWormhole.name);
     return rows.map((r) => ({
       ...r,
       jumpMassClass: null,
       isStatic: staticTypeIds.has(r.typeId),
+      matchesClass: matches(r.typeId, r.sourceClasses),
     }));
   }
 
@@ -126,7 +131,7 @@ export async function wormholeTypesForSystem(systemId: number): Promise<Wormhole
     .select({
       typeId: universeWormhole.typeId,
       name: universeWormhole.name,
-      sourceClass: universeWormhole.sourceClass,
+      sourceClasses: universeWormhole.sourceClasses,
       targetClass: universeWormhole.targetClass,
       jumpMass: universeTypeAttributeEffective.value,
     })
@@ -138,13 +143,13 @@ export async function wormholeTypesForSystem(systemId: number): Promise<Wormhole
         eq(universeTypeAttributeEffective.attrId, jumpMassAttr.id),
       ),
     )
-    .where(where)
     .orderBy(universeWormhole.name);
 
   return rows.map(({ jumpMass, ...r }) => ({
     ...r,
     jumpMassClass: jumpMassBand(jumpMass),
     isStatic: staticTypeIds.has(r.typeId),
+    matchesClass: matches(r.typeId, r.sourceClasses),
   }));
 }
 

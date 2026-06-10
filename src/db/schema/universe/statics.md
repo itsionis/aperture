@@ -15,10 +15,10 @@
 |---|---|---|
 | type_id | int PK | FK → universe_type, CASCADE |
 | name | text NOT NULL | WH code, e.g. `A239`, `K162` |
-| source_class | text | class it can appear in (`C1`–`C6`, `C13`, `HS`, `LS`, `NS`, `Thera`, `Pochven`); same vocabulary as `universe_system.security`. `null` = any (K162) |
-| target_class | text | class it leads into; `null` = unknown (K162) |
+| source_classes | text[] | set of classes it can spawn in (`C1`–`C6`, `C13`, `H`, `L`, `0.0`, `Thera`); same vocabulary as `universe_system.security`. e.g. S199 = `{L, 0.0}`. `null` = anoik leaves source unspecified |
+| target_class | text | class it leads into; `null` = unknown / unmodeled (K162, Drifter destinations) |
 
 - Class-only catalog: mass/lifetime/scan-strength remain dogma-sourced (`universe_type_attribute` + `universe_type_override` via the effective view), so this table vendors only the navigationally-missing source/target class labels.
-- `K162` is the universal reverse-exit: `source_class = null` (appears anywhere), `target_class = null` (resolved from the far side). Class-filter queries treat null source as "always offer".
-- `source_class` is a single text column — anoik WH codes are overwhelmingly single-source. If a future code proves multi-source, promote to a `universe_wormhole_source(type_id, source_class)` junction; do not build it speculatively.
-- Seeded from vendored `scripts/data/wormhole-classes.csv`.
+- `source_classes` is a Postgres `text[]`: a hole can spawn in several classes (e.g. `S199 = {L, 0.0}`, `R943 = {H, L, 0.0}`). `null` = anoik leaves the source unspecified — the universal `K162` reverse-exit **plus** the Drifter/shattered-access holes (e.g. `A009`, `B735`) whose source class falls outside Aperture's vocabulary. Class-filter queries treat null source as "always offer".
+- `K162` is the universal reverse-exit: `source_classes = null` (appears anywhere), `target_class = null` (resolved from the far side).
+- Seeded from vendored `scripts/data/wormhole-classes.csv` (`code;sourceClasses;targetClass`, `sourceClasses` `|`-joined).

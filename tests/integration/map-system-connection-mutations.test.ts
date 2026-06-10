@@ -85,9 +85,9 @@ describe.skipIf(!run)('system & connection mutations (real Postgres)', () => {
       { id: WH_C5, groupId: GROUP, name: 'WH C5' },
     ]);
     await db.insert(universeWormhole).values([
-      { typeId: WH_C3_HS, name: 'X877', sourceClass: 'C3', targetClass: 'H' },
-      { typeId: WH_K162, name: 'K162', sourceClass: null, targetClass: null },
-      { typeId: WH_C5, name: 'M555', sourceClass: 'C5', targetClass: 'C3' },
+      { typeId: WH_C3_HS, name: 'X877', sourceClasses: ['C3'], targetClass: 'H' },
+      { typeId: WH_K162, name: 'K162', sourceClasses: null, targetClass: null },
+      { typeId: WH_C5, name: 'M555', sourceClasses: ['C5'], targetClass: 'C3' },
     ]);
     // The C3 system has a static (X877) leading to hi-sec.
     await db.insert(universeSystemStatic).values({ systemId: C3, typeId: WH_C3_HS });
@@ -111,7 +111,9 @@ describe.skipIf(!run)('system & connection mutations (real Postgres)', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(() => mapEventPayloadSchema.parse(result.data)).not.toThrow();
-    expect(result.data).toMatchObject({ kind: 'system.added', systemId: C3, statics: ['X877'] });
+    // `statics` carries far-side target-class labels (systemNode resolves
+    // targetClass ?? code); X877 leads to hi-sec, so the class is 'H'.
+    expect(result.data).toMatchObject({ kind: 'system.added', systemId: C3, statics: ['H'] });
     expect(await eventCount()).toBe(before + 1);
 
     const [row] = await db
@@ -232,15 +234,32 @@ describe.skipIf(!run)('system & connection mutations (real Postgres)', () => {
     expect(remaining).toHaveLength(0); // hard delete
   });
 
-  it('wormholeTypesForSystem returns class-correct codes plus K162', async () => {
-    // Invariant-based: the real seeded catalog is also present, so assert the
-    // filter rule rather than an exact set.
+  it('wormholeTypesForSystem returns the full catalog annotated with matchesClass', async () => {
+    // The full catalog is returned now (the client splits matched vs. "show all"),
+    // so assert the matchesClass rule rather than a filtered set. The real seeded
+    // catalog is present too, which lets us pin the user-reported leak cases.
     const types = await wormholeTypesForSystem(C3);
-    expect(types.every((t) => t.sourceClass === null || t.sourceClass === 'C3')).toBe(true);
-    const names = types.map((t) => t.name);
-    expect(names).toContain('X877'); // our C3-source row
-    expect(names).toContain('K162'); // null-source universal (appears anywhere)
-    expect(names).not.toContain('M555'); // our C5-source row — excluded for a C3 system
+    // Key our fixtures by typeId — the seeded catalog has real rows that reuse
+    // the codes X877 / M555 (different classes), so a name key would collide.
+    const byId = new Map(types.map((t) => [t.typeId, t]));
+    const byName = new Map(types.map((t) => [t.name, t]));
+
+    expect(byId.get(WH_C3_HS)?.matchesClass).toBe(true); // C3-source (and a C3 static)
+    expect(byId.get(WH_C3_HS)?.isStatic).toBe(true);
+    expect(byId.get(WH_K162)?.matchesClass).toBe(true); // null-source universal
+    expect(byId.get(WH_C5)?.matchesClass).toBe(false); // C5-source — not a C3 match
+
+    // The over-inclusion the change fixes: k-space-sourced holes must not match
+    // a C3 system (they were previously offered everywhere via a null source).
+    expect(byName.get('R943')?.matchesClass).toBe(false); // {H,L,0.0} → C2
+    expect(byName.get('S199')?.matchesClass).toBe(false); // {L,0.0} → 0.0
+
+    // Every class-matched, non-static row is null-source or contains C3.
+    for (const t of types) {
+      if (t.matchesClass && !t.isStatic) {
+        expect(t.sourceClasses === null || t.sourceClasses.includes('C3')).toBe(true);
+      }
+    }
   });
 
   it('staticMatchForConnection matches the source system static by target class', async () => {

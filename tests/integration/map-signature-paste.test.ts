@@ -74,7 +74,7 @@ describe.skipIf(!run)('bulk signature paste — diff / atomic commit (real Postg
     // also has a `B274` row at a different `typeId`).
     await db
       .insert(universeWormhole)
-      .values({ typeId: TYPE_UNSTABLE, name: 'X901', sourceClass: 'HS', targetClass: 'HS' });
+      .values({ typeId: TYPE_UNSTABLE, name: 'X901', sourceClasses: ['H'], targetClass: 'H' });
 
     const [m] = await db
       .insert(apMap)

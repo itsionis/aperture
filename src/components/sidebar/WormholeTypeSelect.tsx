@@ -43,12 +43,16 @@ export function WormholeTypeSelect({
     loading: true,
     options: [],
   });
+  // Whether the "other classes" group (holes that don't plausibly spawn here) is
+  // expanded. Collapsed by default — the whole point is a short list.
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     fetchWormholeTypes({ mapId, universeSystemId }).then((result) => {
       if (cancelled) return;
       setState({ loading: false, options: result.ok ? result.data : [] });
+      setShowAll(false);
     });
     return () => {
       cancelled = true;
@@ -63,13 +67,19 @@ export function WormholeTypeSelect({
     return labels;
   }, [options]);
 
-  // Pin the system's statics to the top so they're the first thing the user
-  // sees; the rest keep the server's alphabetical order.
-  const { statics, others } = useMemo(() => {
+  // Three groups: the system's statics (pinned), holes that plausibly spawn in
+  // this class (shown by default), and everything else (behind "show all").
+  // Each keeps the server's alphabetical order.
+  const { statics, classMatched, others } = useMemo(() => {
     const statics: WormholeTypeOption[] = [];
+    const classMatched: WormholeTypeOption[] = [];
     const others: WormholeTypeOption[] = [];
-    for (const opt of options) (opt.isStatic ? statics : others).push(opt);
-    return { statics, others };
+    for (const opt of options) {
+      if (opt.isStatic) statics.push(opt);
+      else if (opt.matchesClass) classMatched.push(opt);
+      else others.push(opt);
+    }
+    return { statics, classMatched, others };
   }, [options]);
 
   const stringValue = value == null ? NONE_VALUE : String(value);
@@ -133,10 +143,30 @@ export function WormholeTypeSelect({
               Statics
             </div>
             {statics.map(renderOption)}
-            {others.length > 0 && <div className="my-0.5 h-px bg-border" />}
+            {classMatched.length > 0 && <div className="my-0.5 h-px bg-border" />}
           </>
         )}
-        {others.map(renderOption)}
+        {classMatched.map(renderOption)}
+        {others.length > 0 && (
+          <>
+            <div className="my-0.5 h-px bg-border" />
+            <button
+              type="button"
+              // Toggle the "other classes" group without selecting an item or
+              // dismissing the popup (this isn't a SelectItem, so base-ui leaves
+              // it alone — just stop the click from bubbling to the trigger).
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowAll((v) => !v);
+              }}
+              className="w-full rounded-md px-2 py-1 text-left text-[11px] font-medium uppercase text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              {showAll ? 'Show fewer' : `Show all types (+${others.length})`}
+            </button>
+            {showAll && others.map(renderOption)}
+          </>
+        )}
       </SelectContent>
     </Select>
   );

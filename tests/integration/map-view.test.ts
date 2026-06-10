@@ -81,7 +81,7 @@ describe('read-only map view (real Postgres)', () => {
       .values({ id: WH_TYPE, groupId: GROUP, name: 'Wormhole XYZ' });
     await db
       .insert(universeWormhole)
-      .values({ typeId: WH_TYPE, name: 'XYZ', sourceClass: 'C3', targetClass: null });
+      .values({ typeId: WH_TYPE, name: 'XYZ', sourceClasses: ['C3'], targetClass: null });
     await db.insert(universeSystemStatic).values({ systemId: WH, typeId: WH_TYPE });
 
     // Synthetic viewer with admin authz so `loadMapForView` passes the rights

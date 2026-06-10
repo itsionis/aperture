@@ -75,7 +75,7 @@ describe.skipIf(!run)('map import/export — round-trip + remap (real Postgres)'
       .values({ id: TYPE_UNSTABLE, groupId: GROUP_WORMHOLE, name: 'Unstable Wormhole' });
     await db
       .insert(universeWormhole)
-      .values({ typeId: TYPE_UNSTABLE, name: 'X902', sourceClass: 'HS', targetClass: 'HS' });
+      .values({ typeId: TYPE_UNSTABLE, name: 'X902', sourceClasses: ['H'], targetClass: 'H' });
 
     const [m] = await db
       .insert(apMap)

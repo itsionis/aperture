@@ -18,13 +18,15 @@ export const universeSystemStatic = pgTable(
 // Community-compounded wormhole routing catalog (anoik.is /wormholes). The
 // source/target class labels are absent from the SDE and ESI; mass, lifetime,
 // and scan strength stay dogma-sourced via universe_type_attribute_effective.
-// K162 is the universal reverse-exit: null source = appears anywhere, null
-// target = resolved from the far side.
+// source_classes is the set of system classes a hole can spawn in (e.g. S199 in
+// {LS, NS}); null = anoik leaves the source unspecified — the universal K162
+// reverse-exit plus the Drifter/shattered-access holes whose source class isn't
+// in Aperture's vocabulary. null target = resolved from the far side.
 export const universeWormhole = pgTable('universe_wormhole', {
   typeId: integer('type_id')
     .primaryKey()
     .references(() => universeType.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
-  sourceClass: text('source_class'),
+  sourceClasses: text('source_classes').array(),
   targetClass: text('target_class'),
 });

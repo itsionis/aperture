@@ -517,9 +517,11 @@ async function ingestTypeOverrides(wormholeCodeToTypeId: Map<string, number>) {
 }
 
 /**
- * Vendored `code;sourceClass;targetClass` CSV (anoik.is /wormholes) → the
+ * Vendored `code;sourceClasses;targetClass` CSV (anoik.is /wormholes) → the
  * `universe_wormhole` routing catalog. Class labels are absent from the SDE;
- * mass/lifetime stay dogma-sourced. Empty class cells become null (K162 = any).
+ * mass/lifetime stay dogma-sourced. `sourceClasses` is a `|`-joined set (a hole
+ * can spawn in several classes, e.g. `S199` = `L|0.0`); an empty cell becomes
+ * null (source unspecified — K162 and the Drifter/shattered-access holes).
  */
 async function ingestWormholeCatalog(wormholeCodeToTypeId: Map<string, number>) {
   const path = join(DATA_DIR, 'wormhole-classes.csv');
@@ -534,8 +536,12 @@ async function ingestWormholeCatalog(wormholeCodeToTypeId: Map<string, number>) 
     skip_empty_lines: true,
     trim: true,
   }) as Record<string, string>[];
-  const rows: { typeId: number; name: string; sourceClass: string | null; targetClass: string | null }[] =
-    [];
+  const rows: {
+    typeId: number;
+    name: string;
+    sourceClasses: string[] | null;
+    targetClass: string | null;
+  }[] = [];
   for (const r of records) {
     const code = r.code?.toUpperCase();
     if (!code) continue;
@@ -544,7 +550,7 @@ async function ingestWormholeCatalog(wormholeCodeToTypeId: Map<string, number>) 
     rows.push({
       typeId,
       name: code,
-      sourceClass: r.sourceClass ? r.sourceClass : null,
+      sourceClasses: r.sourceClasses ? r.sourceClasses.split('|') : null,
       targetClass: r.targetClass ? r.targetClass : null,
     });
   }
@@ -557,7 +563,7 @@ async function ingestWormholeCatalog(wormholeCodeToTypeId: Map<string, number>) 
       .values(c)
       .onConflictDoUpdate({
         target: universeWormhole.typeId,
-        set: excluded(universeWormhole, ['name', 'sourceClass', 'targetClass']),
+        set: excluded(universeWormhole, ['name', 'sourceClasses', 'targetClass']),
       });
   }
   return rows.length;

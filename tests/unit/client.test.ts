@@ -107,13 +107,13 @@ describe('client.ts — fetchWormholeTypes', () => {
     mockFetch({
       body: {
         ok: true,
-        data: [{ typeId: 1, name: 'A239', sourceClass: 'C3', targetClass: null }],
+        data: [{ typeId: 1, name: 'A239', sourceClasses: ['C3'], targetClass: null }],
       },
     });
     const result = await fetchWormholeTypes({ mapId: '99', universeSystemId: 31000001 });
     expect(result).toEqual({
       ok: true,
-      data: [{ typeId: 1, name: 'A239', sourceClass: 'C3', targetClass: null }],
+      data: [{ typeId: 1, name: 'A239', sourceClasses: ['C3'], targetClass: null }],
     });
   });
 
@@ -121,7 +121,7 @@ describe('client.ts — fetchWormholeTypes', () => {
     const { calls } = mockFetch({
       body: {
         ok: true,
-        data: [{ typeId: 9, name: 'K162', sourceClass: null, targetClass: null }],
+        data: [{ typeId: 9, name: 'K162', sourceClasses: null, targetClass: null }],
       },
     });
     const first = await fetchWormholeTypes({ mapId: '42', universeSystemId: 31000777 });

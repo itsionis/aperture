@@ -10,7 +10,7 @@
 ### wormholeJumpInfo(): Promise<WormholeJumpInfoRow[]>
 Returns every row in `universe_wormhole` ordered by code, each joined with its dogma mass/lifetime/sig-strength.
 
-- Routing fields (`code`, `sourceClass`, `targetClass`) come from `universe_wormhole`.
+- Routing fields (`code`, `sourceClasses`, `targetClass`) come from `universe_wormhole`. `sourceClasses` is a `string[] | null` (the set of classes the hole spawns in; null = source unspecified).
 - `totalMass` / `jumpMass` / `lifetimeMinutes` / `sigStrength` come from the `universe_type_attribute_effective` view (so the attr-3974 sig-strength override is applied). Attribute ids are resolved by name (`wormholeMaxStableMass`, `wormholeMaxJumpMass`, `wormholeMaxStableTime`, `scanWormholeStrength`) from `universe_dogma_attribute`; an unresolved name yields `null` for that column rather than throwing.
 
-**Returns:** `WormholeJumpInfoRow[]` — `{ code, sourceClass, targetClass, totalMass, jumpMass, lifetimeMinutes, sigStrength }`. Re-exported from `src/types/index.ts`.
+**Returns:** `WormholeJumpInfoRow[]` — `{ code, sourceClasses, targetClass, totalMass, jumpMass, lifetimeMinutes, sigStrength }`. Re-exported from `src/types/index.ts`.

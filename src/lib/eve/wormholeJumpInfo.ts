@@ -28,8 +28,8 @@ const ATTR_NAMES = {
 export type WormholeJumpInfoRow = {
   /** WH code, e.g. `A239`, `K162`. */
   code: string;
-  /** Class it appears in; null = anywhere (the universal K162 reverse-exit). */
-  sourceClass: string | null;
+  /** Classes it spawns in; null = source unspecified (K162 + Drifter/shattered-access holes). */
+  sourceClasses: string[] | null;
   /** Class it leads into; null = resolved from the far side. */
   targetClass: string | null;
   /** Total stable mass (kg). */
@@ -63,7 +63,7 @@ export async function wormholeJumpInfo(): Promise<WormholeJumpInfoRow[]> {
     .select({
       typeId: universeWormhole.typeId,
       code: universeWormhole.name,
-      sourceClass: universeWormhole.sourceClass,
+      sourceClasses: universeWormhole.sourceClasses,
       targetClass: universeWormhole.targetClass,
     })
     .from(universeWormhole)
@@ -107,7 +107,7 @@ export async function wormholeJumpInfo(): Promise<WormholeJumpInfoRow[]> {
 
   return whRows.map((r) => ({
     code: r.code,
-    sourceClass: r.sourceClass,
+    sourceClasses: r.sourceClasses,
     targetClass: r.targetClass,
     totalMass: valueOf(r.typeId, totalMassId),
     jumpMass: valueOf(r.typeId, jumpMassId),

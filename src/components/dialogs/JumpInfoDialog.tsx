@@ -154,20 +154,23 @@ function fmtSig(value: number | null): string {
 }
 
 /**
- * Group rows by source class for the statics overview. Null source (the
- * universal K162 reverse-exit) is bucketed last under "Any". Within a class,
- * codes stay in the catalog's code order.
+ * Group rows by source class for the statics overview. A multi-source hole
+ * (e.g. S199 in L+0.0) appears under each of its classes. An unspecified source
+ * (null — K162 + Drifter/shattered-access holes) is bucketed last under "Any".
+ * Within a class, codes stay in the catalog's code order.
  */
 function groupBySource(
   rows: WormholeJumpInfoRow[],
 ): { sourceClass: string; entries: { code: string; targetClass: string | null }[] }[] {
-  const ANY = 'Any (K162)';
+  const ANY = 'Any';
   const buckets = new Map<string, { code: string; targetClass: string | null }[]>();
   for (const r of rows) {
-    const key = r.sourceClass ?? ANY;
-    const list = buckets.get(key) ?? [];
-    list.push({ code: r.code, targetClass: r.targetClass });
-    buckets.set(key, list);
+    const keys = r.sourceClasses && r.sourceClasses.length > 0 ? r.sourceClasses : [ANY];
+    for (const key of keys) {
+      const list = buckets.get(key) ?? [];
+      list.push({ code: r.code, targetClass: r.targetClass });
+      buckets.set(key, list);
+    }
   }
   return [...buckets.entries()]
     .sort(([a], [b]) => {
