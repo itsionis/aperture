@@ -124,6 +124,7 @@ const systemNodeBody = {
   name: z.string(),
   alias: z.string().nullable(),
   tag: z.string().nullable(),
+  intelNotes: z.string().nullable(),
   status: systemStatusEnum,
   security: z.string().nullable(),
   trueSec: z.number().nullable(),

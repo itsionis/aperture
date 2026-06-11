@@ -6,7 +6,7 @@
 ---
 
 ### buildSystemNode(tx, mapSystemId): Promise<MapEventPatch<'system.added'>>
-Called inside a `commitMapEvent` `mutate` callback (so the just-inserted/updated row is visible to the transaction's `select`). Returns the patch body matching `mapEventPayloadSchema`'s `system.added` variant — everything the canvas needs to render the node without a follow-up fetch.
+Called inside a `commitMapEvent` `mutate` callback (so the just-inserted/updated row is visible to the transaction's `select`). Returns the patch body matching `mapEventPayloadSchema`'s `system.added` variant — everything the canvas needs to render the node without a follow-up fetch, including `intelNotes`.
 
 `statics` carries the resolved far-side **target class** (`universe_wormhole.target_class ?? name`), matching `loadMap`'s `loadStatics`. Rows with no resolvable class (K162-style) fall back to the raw code and are dropped only when even the code is null. This keeps live-added nodes (location poll / paste) consistent with a full page reload, so the canvas colours statics by class instead of rendering raw WH codes in grey.
 

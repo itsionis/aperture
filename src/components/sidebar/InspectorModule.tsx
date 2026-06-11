@@ -109,11 +109,10 @@ function SystemInspector({
   onPatch: (patch: UpdateSystemBody) => void;
   onRemove: () => void;
 }) {
-  // `intelNotes` isn't part of `MapViewData`; we keep a local draft that's
-  // committed on blur so PATCHes don't fire per keystroke. The parent renders
-  // this component with `key={system.id}` so the draft naturally resets when
-  // the selected system changes.
-  const [intelDraft, setIntelDraft] = useState('');
+  // Local draft seeded from the stored value, committed on blur so PATCHes
+  // don't fire per keystroke. The parent renders this component with
+  // `key={system.id}`, so the draft re-seeds when the selected system changes.
+  const [intelDraft, setIntelDraft] = useState(system.intelNotes ?? '');
 
   return (
     <Card>
@@ -165,9 +164,9 @@ function SystemInspector({
             value={intelDraft}
             onChange={(e) => setIntelDraft(e.target.value)}
             onBlur={() => {
-              if (intelDraft.length > 0) {
-                onPatch({ intelNotes: intelDraft });
-                setIntelDraft('');
+              const next = intelDraft.length > 0 ? intelDraft : null;
+              if (next !== (system.intelNotes ?? null)) {
+                onPatch({ intelNotes: next });
               }
             }}
             placeholder="Notes are committed on blur."

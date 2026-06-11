@@ -10,6 +10,7 @@ const SYSTEM: MapSystemNode = {
   name: 'Jita',
   alias: null,
   tag: null,
+  intelNotes: null,
   status: 'unknown',
   security: 'H',
   trueSec: 0.9,

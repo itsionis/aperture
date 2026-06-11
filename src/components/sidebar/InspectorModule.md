@@ -22,8 +22,8 @@ One of three sub-views:
 
 ### Behaviour & Interactions
 - All edits go through the supplied callbacks; the inspector itself holds no view state beyond the intel-notes draft and the rally toggle UI.
-- `intelNotes` is intentionally write-only here: the field is not in `MapViewData` (so we keep a local draft) and commits on blur to avoid a PATCH per keystroke.
-- Selecting a different system clears the intel draft.
+- `intelNotes` is read-write: the textarea seeds a local draft from `system.intelNotes` and commits on blur (only when the draft differs from the stored value) to avoid a PATCH per keystroke. Emptying the field commits `null`.
+- Selecting a different system re-seeds the intel draft (the sub-view is keyed by `system.id`).
 - A jump-mass value of `__none__` maps to `null` on the wire.
 
 ### Depends On

@@ -21,6 +21,7 @@ const sys1: MapSystemNode = {
   name: 'Jita',
   alias: null,
   tag: null,
+  intelNotes: null,
   status: 'unknown',
   security: '0.9',
   trueSec: 0.9,
@@ -126,7 +127,7 @@ describe('applyEvent — system.updated', () => {
     expect(next.systems[0]).toMatchObject({ positionX: 500, positionY: 600 });
   });
 
-  it('applies rallyAt but ignores intelNotes (not in MapViewData)', () => {
+  it('applies intelNotes and rallyAt', () => {
     const state = makeState({ systems: [sys1] });
     const next = applyEvent(state, {
       kind: 'system.updated',
@@ -135,7 +136,7 @@ describe('applyEvent — system.updated', () => {
       intelNotes: 'enemy camp',
       rallyAt: '2026-01-01T00:00:00Z',
     });
-    expect(next.systems[0]).not.toHaveProperty('intelNotes');
+    expect(next.systems[0]!.intelNotes).toBe('enemy camp');
     expect(next.systems[0]!.rallyAt).toBe('2026-01-01T00:00:00Z');
   });
 

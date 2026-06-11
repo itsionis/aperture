@@ -38,12 +38,12 @@ export function applyEvent(state: MapViewData, payload: MapEventPayload): MapVie
           const next = { ...s };
           if (payload.alias !== undefined) next.alias = payload.alias;
           if (payload.tag !== undefined) next.tag = payload.tag;
+          if (payload.intelNotes !== undefined) next.intelNotes = payload.intelNotes;
           if (payload.status !== undefined) next.status = payload.status;
           if (payload.locked !== undefined) next.locked = payload.locked;
           if (payload.positionX !== undefined) next.positionX = payload.positionX;
           if (payload.positionY !== undefined) next.positionY = payload.positionY;
           if (payload.rallyAt !== undefined) next.rallyAt = payload.rallyAt;
-          // intelNotes is not in MapViewData; silently skipped.
           return next;
         }),
       };

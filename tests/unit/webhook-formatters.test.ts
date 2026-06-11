@@ -62,6 +62,7 @@ describe('formatHistoryMessage', () => {
       name: 'Jita',
       alias: null,
       tag: null,
+      intelNotes: null,
       status: 'unknown',
       security: '0.9',
       trueSec: 0.95,
