@@ -16,18 +16,19 @@
 
 ### Renders
 One of three sub-views:
-- **`SystemInspector`** — status select, alias / tag inputs (per-keystroke commit), intel notes textarea (committed on blur), locked checkbox, rally toggle button (label reads "Set rally" / "Clear rally" depending on current state), "Remove from map" button. Signatures are now a separate full-width panel below the map (see `SignatureModule`). The card title and the alias-input placeholder use `systemDisplayName(system.systemId, system.name)`, which shows the short community name for the five Drifter systems (e.g. "Barbican"); display only, the stored name is unchanged.
+- **`SystemInspector`** — status select, alias / tag inputs (committed on blur/Enter), intel notes textarea (committed on blur), locked checkbox, rally toggle button (label reads "Set rally" / "Clear rally" depending on current state), "Remove from map" button. Rendered in the compact card size (`<Card size="sm">`) with a tighter `gap-2` row stack. Signatures are now a separate full-width panel below the map (see `SignatureModule`). The card title shows `systemDisplayName(system.systemId, system.name)` — never the alias — and truncates with an ellipsis so a long name doesn't widen the panel at `minW: 1`; the alias remains editable in its own input. The header column is pinned to `minmax(0,1fr)` and the title is `select-none` so the ellipsis survives clicking/focus rather than re-expanding. Hovering/focusing the title opens a base-ui `Tooltip` showing the raw canonical SDE name (`system.name`), which for Drifter systems differs from the displayed short community name. `systemDisplayName` shows that short name for the five Drifter systems (e.g. "Barbican"); display only, the stored name is unchanged. The same helper feeds the alias-input placeholder.
 - **`ConnectionInspector`** — scope / mass / jump-mass / EOL-stage selects (EOL stage is `None` / `EOL (~4h)` / `Critical (~1h)`), Preserve / Rolling checkboxes, a live "Expires in X" / "EOL expires in X" hint (`ConnectionExpiryHint`, derived from `connectionTimeLeftMs` + `formatRelativeFromMs`, hidden for non-wormhole scopes), the read-only per-jump `ConnectionMassLog` (server-derived cumulative mass), then the "Delete connection" button. Receives `mapId` (from `viewData.map.id`) to feed the mass-log fetch; remounted via `key={connection.id}`.
 - **`EmptyInspector`** — placeholder card prompting the user to select something.
 
 ### Behaviour & Interactions
-- All edits go through the supplied callbacks; the inspector itself holds no view state beyond the intel-notes draft and the rally toggle UI.
-- `intelNotes` is read-write: the textarea seeds a local draft from `system.intelNotes` and commits on blur (only when the draft differs from the stored value) to avoid a PATCH per keystroke. Emptying the field commits `null`.
-- Selecting a different system re-seeds the intel draft (the sub-view is keyed by `system.id`).
+- All edits go through the supplied callbacks; the inspector itself holds no view state beyond the alias / tag / intel-notes drafts and the rally toggle UI.
+- `alias`, `tag`, and `intelNotes` are read-write via local drafts seeded from the stored values; each commits on blur (only when the draft differs from the stored value) to avoid a PATCH per keystroke. Alias/tag also commit on Enter (the handler blurs the input). Emptying any field commits `null`.
+- Selecting a different system re-seeds all drafts (the sub-view is keyed by `system.id`).
 - A jump-mass value of `__none__` maps to `null` on the wire.
 
 ### Depends On
 - `Select*`, `Card*`, `Button`, `Input` shadcn primitives
+- `Tooltip` (`@base-ui/react/tooltip`) for the canonical-name title tooltip
 - `connectionTimeLeftMs` (`@/lib/map/connectionState`) + `formatRelativeFromMs` (`@/lib/map/relativeTime`) for the expiry hint
 - `ConnectionMassLog` (`@/components/sidebar/ConnectionMassLog`) for the per-jump mass-log block
 - Enum value lists from `@/lib/map/enumLabels`

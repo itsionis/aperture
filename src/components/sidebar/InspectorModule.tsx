@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tooltip } from '@base-ui/react/tooltip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConnectionMassLog } from '@/components/sidebar/ConnectionMassLog';
 import type {
@@ -110,18 +111,36 @@ function SystemInspector({
   onPatch: (patch: UpdateSystemBody) => void;
   onRemove: () => void;
 }) {
-  // Local draft seeded from the stored value, committed on blur so PATCHes
-  // don't fire per keystroke. The parent renders this component with
-  // `key={system.id}`, so the draft re-seeds when the selected system changes.
+  // Local drafts seeded from the stored value, committed on blur/Enter so
+  // PATCHes don't fire per keystroke. The parent renders this component with
+  // `key={system.id}`, so drafts re-seed when the selected system changes.
+  const [aliasDraft, setAliasDraft] = useState(system.alias ?? '');
+  const [tagDraft, setTagDraft] = useState(system.tag ?? '');
   const [intelDraft, setIntelDraft] = useState(system.intelNotes ?? '');
   const displayName = systemDisplayName(system.systemId, system.name);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm">{system.alias ?? displayName}</CardTitle>
+    <Card size="sm" className="data-[size=sm]:pb-0">
+      {/* minmax(0,1fr) keeps the single grid column from re-expanding on click,
+          so the title's ellipsis survives text selection / focus. */}
+      <CardHeader className="grid-cols-[minmax(0,1fr)]">
+        <Tooltip.Root>
+          <Tooltip.Trigger
+            render={<CardTitle />}
+            className="block w-full cursor-default truncate text-sm select-none"
+          >
+            {displayName}
+          </Tooltip.Trigger>
+          <Tooltip.Portal>
+            <Tooltip.Positioner sideOffset={4} side="top" align="start">
+              <Tooltip.Popup className="z-50 rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md">
+                {system.name}
+              </Tooltip.Popup>
+            </Tooltip.Positioner>
+          </Tooltip.Portal>
+        </Tooltip.Root>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3 text-xs">
+      <CardContent className="flex flex-col gap-2 text-xs">
         <Row label="Status">
           <Select<string>
             value={system.status}
@@ -143,8 +162,15 @@ function SystemInspector({
 
         <Row label="Alias">
           <Input
-            value={system.alias ?? ''}
-            onChange={(e) => onPatch({ alias: e.target.value || null })}
+            value={aliasDraft}
+            onChange={(e) => setAliasDraft(e.target.value)}
+            onBlur={() => {
+              const next = aliasDraft.length > 0 ? aliasDraft : null;
+              if (next !== (system.alias ?? null)) onPatch({ alias: next });
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+            }}
             className="h-7"
             placeholder={displayName}
           />
@@ -152,8 +178,15 @@ function SystemInspector({
 
         <Row label="Tag">
           <Input
-            value={system.tag ?? ''}
-            onChange={(e) => onPatch({ tag: e.target.value || null })}
+            value={tagDraft}
+            onChange={(e) => setTagDraft(e.target.value)}
+            onBlur={() => {
+              const next = tagDraft.length > 0 ? tagDraft : null;
+              if (next !== (system.tag ?? null)) onPatch({ tag: next });
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+            }}
             className="h-7"
             placeholder="—"
             maxLength={50}
