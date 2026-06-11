@@ -58,8 +58,8 @@ describe('buildSigSearchResults', () => {
     const b = makeSig({ id: '2', sigId: 'BBB', mapSystemId: 's1', createdAt: new Date(NOW - 7_200_000).toISOString() });
     const rows = buildSigSearchResults([a, b], [sys], BASE, 'sigId', 'asc', NOW);
     expect(rows).toHaveLength(2);
-    expect(rows[0].sig.sigId).toBe('AAA');
-    expect(rows[1].sig.sigId).toBe('BBB');
+    expect(rows[0]!.sig.sigId).toBe('AAA');
+    expect(rows[1]!.sig.sigId).toBe('BBB');
   });
 
   it('filters by name — case-insensitive partial match', () => {
@@ -68,7 +68,7 @@ describe('buildSigSearchResults', () => {
     const b = makeSig({ id: '2', sigId: 'BBB', mapSystemId: 's1', createdAt: new Date(NOW).toISOString(), name: 'Combat Site' });
     const rows = buildSigSearchResults([a, b], [sys], { ...BASE, name: 'nebula' }, 'sigId', 'asc', NOW);
     expect(rows).toHaveLength(1);
-    expect(rows[0].sig.sigId).toBe('AAA');
+    expect(rows[0]!.sig.sigId).toBe('AAA');
   });
 
   it('name filter does not match sigs with null name', () => {
@@ -84,7 +84,7 @@ describe('buildSigSearchResults', () => {
     const wh = makeSig({ id: '2', sigId: 'BBB', mapSystemId: 's1', createdAt: new Date(NOW).toISOString(), groupKey: 'wormhole' });
     const rows = buildSigSearchResults([gas, wh], [sys], { ...BASE, groupKey: 'gas' }, 'sigId', 'asc', NOW);
     expect(rows).toHaveLength(1);
-    expect(rows[0].sig.sigId).toBe('AAA');
+    expect(rows[0]!.sig.sigId).toBe('AAA');
   });
 
   it('filters by maxAgeHours', () => {
@@ -93,7 +93,7 @@ describe('buildSigSearchResults', () => {
     const stale = makeSig({ id: '2', sigId: 'BBB', mapSystemId: 's1', createdAt: new Date(NOW - 7_200_000).toISOString() }); // 2 h
     const rows = buildSigSearchResults([fresh, stale], [sys], { ...BASE, maxAgeHours: 1 }, 'sigId', 'asc', NOW);
     expect(rows).toHaveLength(1);
-    expect(rows[0].sig.sigId).toBe('AAA');
+    expect(rows[0]!.sig.sigId).toBe('AAA');
   });
 
   it('filters by securityClasses', () => {
@@ -103,7 +103,7 @@ describe('buildSigSearchResults', () => {
     const hsSig = makeSig({ id: '2', sigId: 'BBB', mapSystemId: 's2', createdAt: new Date(NOW).toISOString() });
     const rows = buildSigSearchResults([whSig, hsSig], [whSys, hsSys], { ...BASE, securityClasses: ['C3'] }, 'sigId', 'asc', NOW);
     expect(rows).toHaveLength(1);
-    expect(rows[0].sig.sigId).toBe('AAA');
+    expect(rows[0]!.sig.sigId).toBe('AAA');
   });
 
   it('drops sigs whose system is not in the systems list', () => {
@@ -118,8 +118,8 @@ describe('buildSigSearchResults', () => {
     const newer = makeSig({ id: '1', sigId: 'AAA', mapSystemId: 's1', createdAt: new Date(NOW - 3_600_000).toISOString() });
     const older = makeSig({ id: '2', sigId: 'BBB', mapSystemId: 's1', createdAt: new Date(NOW - 7_200_000).toISOString() });
     const rows = buildSigSearchResults([newer, older], [sys], BASE, 'age', 'desc', NOW);
-    expect(rows[0].sig.sigId).toBe('BBB');
-    expect(rows[1].sig.sigId).toBe('AAA');
+    expect(rows[0]!.sig.sigId).toBe('BBB');
+    expect(rows[1]!.sig.sigId).toBe('AAA');
   });
 
   it('sorts by systemName ascending using alias when set', () => {
@@ -128,7 +128,7 @@ describe('buildSigSearchResults', () => {
     const sigA = makeSig({ id: '1', sigId: 'AAA', mapSystemId: 's1', createdAt: new Date(NOW).toISOString() });
     const sigB = makeSig({ id: '2', sigId: 'BBB', mapSystemId: 's2', createdAt: new Date(NOW).toISOString() });
     const rows = buildSigSearchResults([sigA, sigB], [sysA, sysB], BASE, 'systemName', 'asc', NOW);
-    expect(rows[0].system.alias).toBe('Alpha');
-    expect(rows[1].system.alias).toBe('Bravo');
+    expect(rows[0]!.system.alias).toBe('Alpha');
+    expect(rows[1]!.system.alias).toBe('Bravo');
   });
 });
