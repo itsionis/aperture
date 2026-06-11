@@ -71,14 +71,15 @@ export function homeStaticExemptionChanges(
 /** Canonical WH classes always shown in the panel grid, even before discovery. */
 const DEFAULT_ABC_CLASSES = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'];
 
+const TAGGABLE_CLASSES = new Set(['C1', 'C2', 'C3', 'C4', 'C5', 'C6']);
+
 /**
- * True for a security label that gets its own ABC letter sequence. The
- * `universe_system.security` label is `Cn` for wormhole space (`deriveSecurityLabel`),
- * so ABC tags wormhole systems and leaves k-space (`H`/`L`/`0.0`), Abyssal (`A`),
- * and Pochven (`P`) untagged.
+ * True for a security label that gets its own ABC letter sequence.
+ * Only C1–C6 are tagged; C13 shattered/drifter holes and k-space systems are
+ * all named and skipped.
  */
 export function isTaggableClass(securityClass: string | null): securityClass is string {
-  return securityClass != null && securityClass.startsWith('C');
+  return securityClass != null && TAGGABLE_CLASSES.has(securityClass);
 }
 
 /** 0 → "A", 25 → "Z", 26 → "AA", 27 → "AB", … (bijective base-26, spreadsheet-column style). */
@@ -134,14 +135,9 @@ export const abcStrategy: TagStrategy = {
   },
 
   availableTags(ctx: TagContext): AvailableTags {
-    const present = ctx.systems
-      .map((s) => s.securityClass)
-      .filter(isTaggableClass);
-    // Canonical C1–C6 always, plus any other taggable class currently on the map.
-    const classes = [...new Set([...DEFAULT_ABC_CLASSES, ...present])];
     return {
       scheme: 'abc',
-      perClass: classes.map((classLabel) => ({
+      perClass: DEFAULT_ABC_CLASSES.map((classLabel) => ({
         classLabel,
         next: lowestFreeLetters(usedIndicesForClass(ctx, classLabel), 3),
       })),

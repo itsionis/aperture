@@ -1,9 +1,14 @@
 ## maps.ts (admin server actions)
 
-**Purpose:** Admin actions on `ap_map` rows. Three operations exposed at `/admin/maps`: soft-delete (sets `deleted_at`), restore (clears `deleted_at`), and purge-now (admin-only hard delete that skips the 30-day `map-purge` cron grace). All gated by `isManagerOrAdmin` + `adminVisibilityScope`, not the corp-right matrix — the admin panel is the manager/admin's override path.
+**Purpose:** Admin actions on `ap_map` rows. Four operations exposed at `/admin/maps`: soft-delete (sets `deleted_at`), restore (clears `deleted_at`), purge-now (admin-only hard delete that skips the 30-day `map-purge` cron grace), and settings update (behavior toggles + auto-tagging config). All gated by `isManagerOrAdmin` + `adminVisibilityScope`, not the corp-right matrix — the admin panel is the manager/admin's override path.
 **File:** `src/app/(admin)/actions/maps.ts`
 
 ---
+
+### adminUpdateMapSettings(input: AdminUpdateMapSettingsInput): Promise<ActionResult<MapEventPayload>>
+Updates behavior toggles and/or auto-tagging config. All fields optional (only those present in the input are applied). Input: `{ mapId, deleteExpiredConnections?, deleteEolConnections?, trackAbyssalJumps?, logActivity?, tagScheme?, homeMapSystemId?, exemptHomeStaticFromTag? }`.
+
+Gates on `isManagerOrAdmin` + map within scope via `selectScopedMap`. Refuses to act on a soft-deleted map. Commits a `map.update` event via `commitMapEvent`; toggle changes are echoed in the realtime payload, tagging fields are not (config propagates on next map load). Validates `homeMapSystemId` is a visible system on the map. After any tagging-config change, calls `applyHomeStaticExemption` (swallows failures — tagging must never fail the primary save). Revalidates `/admin/maps` and `/maps`.
 
 ### adminSoftDeleteMap(mapId: string): Promise<ActionResult<MapEventPayload>>
 Validates the id, gates on `isManagerOrAdmin`, scope-checks the map via `mapScopeFilterFor`, then runs `commitMapEvent({ kind: 'map.delete' })` with a `mutate` that sets `deleted_at = now()` on the matching non-deleted row. Returns the same payload shape (`{ kind: 'map.delete', id, deletedAt }`) as the user-facing `deleteMapAction` so downstream subscribers don't need to discriminate by caller. Revalidates `/admin/maps` and `/maps`. Refuses to act on an already-soft-deleted map with a clear error.
@@ -26,9 +31,9 @@ Returns the synthesized `{ kind: 'map.purge', eventId, id }` payload (the row th
 ### Depends on
 - `auth` / `isAdmin` / `isManagerOrAdmin` / `adminVisibilityScope` / `mapScopeFilterFor` — `@/lib/auth/rights`.
 - `commitMapEvent` — `@/lib/map/mutations/core`.
-- `apMap` — `@/db/schema`.
+- `applyHomeStaticExemption` — `@/lib/tagging/exemption`.
+- `apMap`, `apMapSystem`, `tagScheme` — `@/db/schema`.
 
 ### Notes
 - The actions deliberately bypass the corp-right matrix. The admin panel exists to give managers/admins authority over their scope without each corp having to grant `map_delete` to its own admin-level members.
 - Manager scope check returns the generic `"Map not found."` instead of `"Forbidden."` to avoid leaking the existence of a corp-scoped map to an out-of-scope manager.
-- The admin panel is a fresh surface; it has no `?cmd=…`-style URL routes.

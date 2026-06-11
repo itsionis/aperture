@@ -10,6 +10,7 @@ const SYSTEM: MapSystemNode = {
   name: 'Jita',
   alias: null,
   tag: null,
+  intelNotes: null,
   status: 'unknown',
   security: 'H',
   trueSec: 0.9,
@@ -27,6 +28,7 @@ const SYSTEM: MapSystemNode = {
 const INTEL: SystemIntelSummary = {
   sovereignty: null,
   factionWar: null,
+  incursion: null,
   scoutConnections: [
     {
       sourceName: 'Thera',

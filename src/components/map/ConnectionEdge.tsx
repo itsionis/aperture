@@ -13,6 +13,8 @@ import {
 import type { MapConnectionEdge } from '@/lib/map/loadMap';
 import { connectionTimeLeftMs } from '@/lib/map/connectionState';
 import { formatRelativeFromMs } from '@/lib/map/relativeTime';
+import { Tooltip } from '@base-ui/react/tooltip';
+import { RefreshCw, Shield, type LucideIcon } from 'lucide-react';
 import { connectionBadges, connectionStyle } from './styling';
 import { useTravelForConnection } from './MapTravelContext';
 
@@ -133,7 +135,8 @@ export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) 
   const finalStyle = selected ? { ...style, strokeWidth: (style.strokeWidth ?? 3) + 2 } : style;
   const badges = connectionBadges(data);
   const countdown = useEolCountdown(data);
-  const hasLabel = badges.length > 0 || countdown !== null;
+  const hasLabel =
+    badges.length > 0 || countdown !== null || data.isRolling || data.preserveMass;
   const travel = useTravelForConnection(props.id);
 
   return (
@@ -150,23 +153,79 @@ export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) 
       {hasLabel && (
         <EdgeLabelRenderer>
           <div
-            className="pointer-events-none absolute flex gap-0.5 rounded bg-card/90 px-1 py-0.5 text-[9px] font-medium leading-none ring-1 ring-foreground/10"
+            className="nodrag nopan pointer-events-none absolute flex flex-col items-center gap-1"
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
           >
-            {badges.map((b) => (
-              <span key={b} style={{ color: style.stroke }}>
-                {b}
-              </span>
-            ))}
-            {countdown !== null && (
-              <span className="text-muted-foreground" aria-label="EOL time remaining">
-                {countdown}
-              </span>
+            {(data.isRolling || data.preserveMass) && (
+              <div className="flex items-center gap-1">
+                {data.isRolling && (
+                  <DoNotJumpFlag
+                    icon={RefreshCw}
+                    label="ROLLING — do not jump this hole. Its mass is being deliberately collapsed."
+                  />
+                )}
+                {data.preserveMass && (
+                  <DoNotJumpFlag
+                    icon={Shield}
+                    label="PRESERVE MASS — do not jump this hole unless absolutely necessary; every pass shortens its life."
+                  />
+                )}
+              </div>
+            )}
+            {(badges.length > 0 || countdown !== null) && (
+              <div className="flex items-center gap-1 rounded bg-card/90 px-1.5 py-0.5 text-[11px] font-semibold leading-none ring-1 ring-foreground/10">
+                {badges.map((b) =>
+                  b.warn ? (
+                    <span
+                      key={b.key}
+                      className="rounded-sm bg-amber-400 px-1 py-px font-bold text-black"
+                      aria-label="Small connection — frigate-size ships only"
+                    >
+                      {b.label}
+                    </span>
+                  ) : (
+                    <span key={b.key} style={{ color: style.stroke }}>
+                      {b.label}
+                    </span>
+                  ),
+                )}
+                {countdown !== null && (
+                  <span className="text-muted-foreground" aria-label="EOL time remaining">
+                    {countdown}
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </EdgeLabelRenderer>
       )}
     </>
+  );
+}
+
+// A loud "do not jump" flag stacked above the connection label. Rolling and
+// preserve-mass both mean the same thing to a pilot at the keyboard — keep your
+// ship out of this hole — so both render as a large red glyph in a filled red
+// badge with an explanatory tooltip. `pointer-events-auto` re-enables hover on
+// the icon (the label wrapper is `pointer-events-none` so clicks hit the path);
+// `nodrag nopan` stops the interaction from dragging the canvas.
+function DoNotJumpFlag({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger
+        render={<span />}
+        className="nodrag nopan pointer-events-auto inline-flex items-center justify-center rounded-full bg-red-600 p-1 shadow-md ring-2 ring-red-300/40"
+      >
+        <Icon className="size-5 text-white" strokeWidth={2.75} aria-hidden />
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Positioner sideOffset={4} side="top" align="center">
+          <Tooltip.Popup className="nodrag nopan z-50 max-w-[220px] rounded-md border border-red-500/40 bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md">
+            {label}
+          </Tooltip.Popup>
+        </Tooltip.Positioner>
+      </Tooltip.Portal>
+    </Tooltip.Root>
   );
 }
 

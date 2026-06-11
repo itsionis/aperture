@@ -6,9 +6,9 @@
 ---
 
 ### abcStrategy: TagStrategy
-- `tagOnAdd(ctx, subject)` — returns the lowest free letter for the subject's WH class, or `null` for non-wormhole systems or the Home system. Taggable classes are the `Cn` labels from `deriveSecurityLabel` (wormhole space); k-space (`H`/`L`/`0.0`), Abyssal (`A`), and Pochven (`P`) are left untagged. The designated Home system (`ctx.homeMapSystemId`) is also always skipped. Each class has its own independent A, B, C… sequence; the lowest free ordinal is always chosen, so deleting a tagged system reclaims its letter.
+- `tagOnAdd(ctx, subject)` — returns the lowest free letter for the subject's WH class, or `null` for non-taggable systems or the Home system. Only C1–C6 are taggable; k-space (`H`/`L`/`0.0`), Abyssal (`A`), Pochven (`P`), and any other `Cn` label (e.g. C13 shattered/drifter) are left untagged — those systems have named identities. The designated Home system (`ctx.homeMapSystemId`) is also always skipped. Each class has its own independent A, B, C… sequence; the lowest free ordinal is always chosen, so deleting a tagged system reclaims its letter.
 - `tagOnConnect()` — always `null` (ABC is topology-independent).
-- `availableTags(ctx)` — `{ scheme: 'abc', perClass }` listing the next 3 free letters for C1–C6 plus any other taggable class present on the map.
+- `availableTags(ctx)` — `{ scheme: 'abc', perClass }` listing the next 3 free letters for each of C1–C6 (always the fixed set; no other classes).
 
 Letters use bijective base-26 (A…Z, AA, AB…) so a class with >26 holes keeps assigning. `letterForIndex`, `indexForLetter`, and `isTaggableClass` are **exported** (reused below); `lowestFreeLetters` stays internal.
 

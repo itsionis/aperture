@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tooltip } from '@base-ui/react/tooltip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConnectionMassLog } from '@/components/sidebar/ConnectionMassLog';
 import type {
@@ -31,12 +32,14 @@ import {
   SYSTEM_STATUSES,
   WH_JUMP_MASSES,
   WH_MASSES,
+  WH_MASS_LABELS,
   type ConnectionScope,
   type EolStage,
   type SystemStatus,
   type WhJumpMass,
   type WhMass,
 } from '@/lib/map/enumLabels';
+import { systemDisplayName } from '@/lib/eve/drifterSystems';
 
 const NONE_JUMP_MASS = '__none__';
 
@@ -109,18 +112,36 @@ function SystemInspector({
   onPatch: (patch: UpdateSystemBody) => void;
   onRemove: () => void;
 }) {
-  // `intelNotes` isn't part of `MapViewData`; we keep a local draft that's
-  // committed on blur so PATCHes don't fire per keystroke. The parent renders
-  // this component with `key={system.id}` so the draft naturally resets when
-  // the selected system changes.
-  const [intelDraft, setIntelDraft] = useState('');
+  // Local drafts seeded from the stored value, committed on blur/Enter so
+  // PATCHes don't fire per keystroke. The parent renders this component with
+  // `key={system.id}`, so drafts re-seed when the selected system changes.
+  const [aliasDraft, setAliasDraft] = useState(system.alias ?? '');
+  const [tagDraft, setTagDraft] = useState(system.tag ?? '');
+  const [intelDraft, setIntelDraft] = useState(system.intelNotes ?? '');
+  const displayName = systemDisplayName(system.systemId, system.name);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm">{system.alias ?? system.name}</CardTitle>
+    <Card size="sm" className="data-[size=sm]:pb-0">
+      {/* minmax(0,1fr) keeps the single grid column from re-expanding on click,
+          so the title's ellipsis survives text selection / focus. */}
+      <CardHeader className="grid-cols-[minmax(0,1fr)]">
+        <Tooltip.Root>
+          <Tooltip.Trigger
+            render={<CardTitle />}
+            className="block w-full cursor-default truncate text-sm select-none"
+          >
+            {displayName}
+          </Tooltip.Trigger>
+          <Tooltip.Portal>
+            <Tooltip.Positioner sideOffset={4} side="top" align="start">
+              <Tooltip.Popup className="z-50 rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md">
+                {system.name}
+              </Tooltip.Popup>
+            </Tooltip.Positioner>
+          </Tooltip.Portal>
+        </Tooltip.Root>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3 text-xs">
+      <CardContent className="flex flex-col gap-2 text-xs">
         <Row label="Status">
           <Select<string>
             value={system.status}
@@ -142,17 +163,31 @@ function SystemInspector({
 
         <Row label="Alias">
           <Input
-            value={system.alias ?? ''}
-            onChange={(e) => onPatch({ alias: e.target.value || null })}
+            value={aliasDraft}
+            onChange={(e) => setAliasDraft(e.target.value)}
+            onBlur={() => {
+              const next = aliasDraft.length > 0 ? aliasDraft : null;
+              if (next !== (system.alias ?? null)) onPatch({ alias: next });
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+            }}
             className="h-7"
-            placeholder={system.name}
+            placeholder={displayName}
           />
         </Row>
 
         <Row label="Tag">
           <Input
-            value={system.tag ?? ''}
-            onChange={(e) => onPatch({ tag: e.target.value || null })}
+            value={tagDraft}
+            onChange={(e) => setTagDraft(e.target.value)}
+            onBlur={() => {
+              const next = tagDraft.length > 0 ? tagDraft : null;
+              if (next !== (system.tag ?? null)) onPatch({ tag: next });
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+            }}
             className="h-7"
             placeholder="—"
             maxLength={50}
@@ -165,9 +200,9 @@ function SystemInspector({
             value={intelDraft}
             onChange={(e) => setIntelDraft(e.target.value)}
             onBlur={() => {
-              if (intelDraft.length > 0) {
-                onPatch({ intelNotes: intelDraft });
-                setIntelDraft('');
+              const next = intelDraft.length > 0 ? intelDraft : null;
+              if (next !== (system.intelNotes ?? null)) {
+                onPatch({ intelNotes: next });
               }
             }}
             placeholder="Notes are committed on blur."
@@ -258,8 +293,8 @@ function ConnectionInspector({
             </SelectTrigger>
             <SelectContent>
               {WH_MASSES.map((s) => (
-                <SelectItem key={s} value={s} className="capitalize">
-                  {s}
+                <SelectItem key={s} value={s}>
+                  {WH_MASS_LABELS[s]}
                 </SelectItem>
               ))}
             </SelectContent>

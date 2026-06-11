@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { TAG_STRATEGIES } from '@/lib/tagging/registry';
 import type { TagContext } from '@/lib/tagging/types';
 import type { MapViewData } from '@/lib/map/loadMap';
+import { systemClassColor } from '@/components/map/styling';
 
 /**
  * Auto-tagging "next available" side panel. Reuses the pure
@@ -53,14 +54,21 @@ export function TagsModule({
       <CardContent>
         {available.scheme === 'abc' ? (
           <ul className="flex flex-col gap-1 text-xs">
-            {available.perClass.map((row) => (
-              <li key={row.classLabel} className="flex items-center justify-between">
-                <span className="text-muted-foreground">{row.classLabel}</span>
-                <span className="font-mono">
-                  {row.next.map((t) => `${t}`).join('  ')}
-                </span>
-              </li>
-            ))}
+            {available.perClass.map((row) => {
+              const color = systemClassColor(row.classLabel);
+              return (
+                <li
+                  key={row.classLabel}
+                  className="flex items-center justify-between"
+                  style={{ color }}
+                >
+                  <span>{row.classLabel}</span>
+                  <span className="font-mono">
+                    {row.next.join('  ')}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         ) : available.perParent.length === 0 ? (
           <p className="text-xs text-muted-foreground">

@@ -57,6 +57,7 @@ export type MapSystemNode = {
   name: string;
   alias: string | null;
   tag: string | null;
+  intelNotes: string | null;
   status: SystemStatus;
   security: string | null;
   trueSec: number | null;
@@ -256,6 +257,7 @@ export async function loadMapForView(
       systemId: apMapSystem.systemId,
       alias: apMapSystem.alias,
       tag: apMapSystem.tag,
+      intelNotes: apMapSystem.intelNotes,
       status: apMapSystem.status,
       locked: apMapSystem.locked,
       rallyAt: apMapSystem.rallyAt,
@@ -338,6 +340,7 @@ export async function loadMapForView(
       name: s.name,
       alias: s.alias,
       tag: s.tag,
+      intelNotes: s.intelNotes,
       status: s.status,
       security: s.security,
       trueSec: s.trueSec,
