@@ -20,6 +20,7 @@
 | `EOL_STAGES` | `readonly ['none', 'eol', 'critical']` | Mirrors `eolStage.enumValues`. |
 | `EolStage` | union type | |
 | `EOL_STAGE_LABELS` | `Record<EolStage, string>` | Human labels for the inspector selector: `None` / `EOL (~4h)` / `Critical (~1h)`. |
+| `WH_MASS_LABELS` | `Record<WhMass, string>` | Human labels for the mass selector: `Fresh (>50%)` / `Reduced (<50%)` / `Critical (<10%)`. |
 
 ### Drift guard
 These lists must stay aligned with `src/db/schema/ap/enums.ts`. The wire-side Zod (`protocol.ts`) still validates everything that comes back from the server, so a stale label would surface as a runtime mismatch, not silently corrupt data.
