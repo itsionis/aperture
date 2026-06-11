@@ -120,14 +120,32 @@ export function connectionStyle(edge: MapConnectionEdge): EdgeStyle {
   };
 }
 
-/** Short labels stacked on a connection (static / EOL / rolling / preserve / frigate / size). */
-export function connectionBadges(edge: MapConnectionEdge): string[] {
-  const badges: string[] = [];
-  if (edge.isStatic) badges.push('STATIC');
-  if (edge.jumpMassClass) badges.push(edge.jumpMassClass.toUpperCase());
-  if (edge.eolStage === 'critical') badges.push('EOL 1h');
-  else if (edge.eolStage === 'eol') badges.push('EOL');
-  if (edge.isRolling) badges.push('ROLL');
-  if (edge.preserveMass) badges.push('PRES');
+export type ConnectionBadge = {
+  key: string;
+  label: string;
+  /**
+   * Small/frigate holes are easy to miss and people bring oversized ships, so
+   * the `s` size badge renders as a filled warning pill rather than plain text.
+   */
+  warn?: boolean;
+};
+
+/**
+ * Text badges stacked on a connection: STATIC, jump-mass size, EOL. Rolling and
+ * preserve-mass are surfaced as standalone icons by `ConnectionEdge`, not here,
+ * because they carry enough operational weight to warrant a glyph over text.
+ */
+export function connectionBadges(edge: MapConnectionEdge): ConnectionBadge[] {
+  const badges: ConnectionBadge[] = [];
+  if (edge.isStatic) badges.push({ key: 'static', label: 'STATIC' });
+  if (edge.jumpMassClass) {
+    badges.push({
+      key: 'size',
+      label: edge.jumpMassClass.toUpperCase(),
+      warn: edge.jumpMassClass === 's',
+    });
+  }
+  if (edge.eolStage === 'critical') badges.push({ key: 'eol', label: 'EOL 1h' });
+  else if (edge.eolStage === 'eol') badges.push({ key: 'eol', label: 'EOL' });
   return badges;
 }

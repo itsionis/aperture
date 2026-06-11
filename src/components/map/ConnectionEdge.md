@@ -7,7 +7,7 @@
 xyflow `EdgeProps` with `data: ConnectionEdgeData` (`MapConnectionEdge & { parallelIndex: number; parallelCount: number }`) and `selected`.
 
 ### Renders
-A `BaseEdge` styled via `connectionStyle` (scope→colour, wormhole recoloured by mass, EOL dashed — tighter for the critical stage, frigate thinned). The path geometry is scope-dependent: `stargate` (gate) links render as a right-angled orthogonal `getSmoothStepPath` (`borderRadius: 0`) so they read distinctly from the smooth `getBezierPath` used by wormhole / jumpbridge / abyssal connections. Plus a midpoint label of badges (`connectionBadges`: jump-mass, `EOL`/`EOL 1h`, ROLL, PRES) when any apply. When `eolStage !== 'none'` the label also carries a live countdown ("23h", "2d", "expired") derived from `eolAt +` the per-stage lifetime constant. When a travel pulse is active for this connection, a faint `TravelDot` (SVG `<circle>` r 3, opacity 0.55, edge stroke colour) with an `<animateMotion>` glides once along the curve.
+A `BaseEdge` styled via `connectionStyle` (scope→colour, wormhole recoloured by mass, EOL dashed — tighter for the critical stage, frigate thinned). The path geometry is scope-dependent: `stargate` (gate) links render as a right-angled orthogonal `getSmoothStepPath` (`borderRadius: 0`) so they read distinctly from the smooth `getBezierPath` used by wormhole / jumpbridge / abyssal connections. Plus a midpoint label laid out as a vertical stack: a **"do not jump" flag row** sits *above* a text-badge row. The flag row carries large red `DoNotJumpFlag` badges (filled red circle, white glyph, `RefreshCw` for `isRolling`, `Shield` for `preserveMass`) each with a hover/focus tooltip spelling out why the hole must not be jumped — these are the loudest thing on the edge. The text-badge row (`text-[11px]`) carries `connectionBadges` (STATIC, jump-mass size, `EOL`/`EOL 1h`) plus a live EOL countdown; the small (`s`) size badge renders as a filled amber warning pill so undersized holes aren't missed. When `eolStage !== 'none'` the countdown ("23h", "2d", "expired") is derived from `eolAt +` the per-stage lifetime constant. When a travel pulse is active for this connection, a faint `TravelDot` (SVG `<circle>` r 5, opacity 0.55, edge stroke colour) with an `<animateMotion>` glides once along the curve.
 
 ### Behaviour & Interactions
 - Selectable by click — `MapCanvas` consumes `onSelectionChange` and routes the selected edge into the sidebar inspector.
@@ -22,5 +22,7 @@ A `BaseEdge` styled via `connectionStyle` (scope→colour, wormhole recoloured b
 
 ### Depends On
 - `@xyflow/react` (`BaseEdge`, `EdgeLabelRenderer`, `Position`, `getBezierPath`, `getSmoothStepPath`, `useInternalNode`, `EdgeProps`).
+- `@base-ui/react/tooltip` (`Tooltip`) for the do-not-jump flag tooltips.
+- `lucide-react` (`RefreshCw` rolling icon, `Shield` preserve-mass icon, `LucideIcon` type).
 - `./styling` for stroke + badge calculation.
 - `@/lib/map/connectionState` (`connectionTimeLeftMs`) + `@/lib/map/relativeTime` (`formatRelativeFromMs`) for the EOL countdown.
