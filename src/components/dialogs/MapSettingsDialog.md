@@ -10,21 +10,18 @@
 | open | boolean | yes | Controlled open state. |
 | onOpenChange | (open: boolean) => void | yes | Open-state setter. |
 | mapId | string | yes | The open map's id. |
-| settings | MapSettings | yes | Seed values (name/icon/scope/type + toggles + tagScheme/homeMapSystemId/exemptHomeStaticFromTag) from `loadMapSettings`. |
+| settings | MapSettings | yes | Seed values (name/icon/scope/type) from `loadMapSettings`. |
 | onImported | (payloads: MapEventPayload[]) => void | yes | Folds imported event payloads onto the live canvas (wired to the canvas's `onBulkPaste`). |
-| canConfigureTagging | boolean | yes | Owner/admin gate: shows the **Tagging** tab. |
-| systems | Pick<MapSystemNode,'id'\|'name'\|'alias'>[] | yes | Visible systems, for the Home-system picker. |
 
 ### Renders
-A tabbed dialog (`Tabs`): **General** (name + icon inputs, read-only scope/visibility), **Settings** (toggle checkboxes), **Tagging** (owner/admin only — scheme select + Home picker + "Exempt home static from auto-tag" checkbox), **Export** (download button), **Import** (file picker).
+A tabbed dialog (`Tabs`): **General** (name + icon inputs, read-only scope/visibility), **Settings** (placeholder for future user display preferences), **Export** (download button), **Import** (file picker).
 
 ### Behaviour & Interactions
 - General Save → `updateMapSettingsAction({ mapId, name, icon })` (`map_update`); empty icon trims to `null`. A name change reflects live on the canvas via the realtime `map.update` echo.
-- Settings Save → `updateMapSettingsAction({ mapId, ...toggles })`.
-- Tagging Save → `updateMapSettingsAction({ mapId, tagScheme, homeMapSystemId, exemptHomeStaticFromTag })` (owner/admin-gated server-side). Home picker disabled when scheme is `Off`; empty Home selection sends `null`. The exemption checkbox is enabled only under ABC with a Home set (`canExempt`); the server reconciles tags after the save. Config propagates to other clients on next map load (not realtime).
+- Settings tab — currently a placeholder; user-scoped visual preferences will be added here in a future iteration.
 - Export → `exportMapOnServer({ mapId })`; on success builds a `Blob` and triggers a download named `aperture-map-<id>-<YYYY-MM-DD>.json`.
 - Import → reads the chosen file, `JSON.parse`s it, posts via `importMapOnServer`; on success calls `onImported(payloads)` and toasts a summary, then resets the file input. Invalid JSON / schema-invalid files toast an error (the client wrapper handles HTTP errors).
-- Scope/type are shown read-only (immutable post-create). Webhooks are intentionally absent (admin-only).
+- Scope/type are shown read-only (immutable post-create). Webhooks, behavior toggles, and auto-tagging are admin-only — they live at `/admin/maps/<id>/settings`.
 
 ### Emits / Calls
 - `updateMapSettingsAction`, `exportMapOnServer`, `importMapOnServer`.

@@ -6,7 +6,6 @@ import { loadRouteConfig } from '@/lib/map/routeConfig';
 import { statsForSystems } from '@/lib/map/stats';
 import { intelForSystems } from '@/lib/map/intel';
 import { structuresForSystems } from '@/lib/structures/read';
-import { isMapOwnerOrAdmin } from '@/lib/auth/rights';
 import {
   getAccountCharacters,
   getConnectionTravelAnimation,
@@ -55,7 +54,6 @@ export default async function MapPage({ params }: { params: Promise<{ slug?: str
     settings,
     travelAnimation,
     signatureIndicators,
-    canConfigureTagging,
     accountCharacters,
     mapLayout,
     routeConfig,
@@ -67,7 +65,6 @@ export default async function MapPage({ params }: { params: Promise<{ slug?: str
     loadMapSettings(BigInt(session.characterId), mapId),
     getConnectionTravelAnimation(session.userId),
     getSignatureIndicatorPrefs(session.userId),
-    isMapOwnerOrAdmin(BigInt(session.characterId), mapId),
     getAccountCharacters(session.userId),
     getMapLayout(session.userId),
     loadRouteConfig(session.userId),
@@ -96,7 +93,6 @@ export default async function MapPage({ params }: { params: Promise<{ slug?: str
       settings={settings}
       travelAnimation={travelAnimation}
       signatureIndicators={signatureIndicators}
-      canConfigureTagging={canConfigureTagging}
       viewerCharacterIds={viewerCharacterIds}
       viewerCharacters={viewerCharacters}
       mainCharacterId={mainCharacterId == null ? null : Number(mainCharacterId)}

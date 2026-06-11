@@ -223,7 +223,6 @@ export function MapCanvas({
   settings,
   travelAnimation,
   signatureIndicators,
-  canConfigureTagging,
   viewerCharacterIds,
   viewerCharacters,
   mainCharacterId,
@@ -239,8 +238,6 @@ export function MapCanvas({
   travelAnimation: boolean;
   /** Viewer's resolved stale/unscanned indicator prefs (threshold + toggles). */
   signatureIndicators: SignatureIndicatorPrefs;
-  /** Owner/admin gate: shows the Map Settings "Tagging" tab. */
-  canConfigureTagging: boolean;
   /** Viewer's account character ids — matched against presence for the CTRL+V fast-paste location check. */
   viewerCharacterIds: number[];
   /** Viewer's active characters (id + name) for the route planner's source picker. */
@@ -1450,8 +1447,6 @@ export function MapCanvas({
           mapId={mapId}
           settings={settings}
           onImported={onBulkPaste}
-          canConfigureTagging={canConfigureTagging}
-          systems={viewData.systems}
         />
         <AddSystemDialog
           open={addSystemOpen}

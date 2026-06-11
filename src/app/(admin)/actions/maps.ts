@@ -2,9 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
+import type { InferInsertModel } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/client';
-import { apMap } from '@/db/schema';
+import { apMap, apMapSystem, tagScheme } from '@/db/schema';
 import { auth } from '@/lib/auth';
 import {
   adminVisibilityScope,
@@ -14,17 +15,18 @@ import {
   type AdminVisibilityScope,
 } from '@/lib/auth/rights';
 import { commitMapEvent, type ActionResult } from '@/lib/map/mutations/core';
-import type { MapEventPayload } from '@/lib/realtime/protocol';
+import type { MapEventPatch, MapEventPayload } from '@/lib/realtime/protocol';
+import { applyHomeStaticExemption } from '@/lib/tagging/exemption';
 
 /**
- * Admin map actions. Three operations, each gated independently of
- * the corp-right matrix because the admin panel is the manager/admin's
- * override path:
+ * Admin map actions. Gated independently of the corp-right matrix:
  *
- *   - `adminSoftDeleteMap`  manager or admin, map within scope → sets `deleted_at`.
- *   - `adminRestoreMap`     manager or admin, map within scope → clears `deleted_at`.
- *   - `adminPurgeMap`       admin only,       map within scope → hard-deletes
- *                           (skips the 30-day `map-purge` cron grace).
+ *   - `adminSoftDeleteMap`      manager or admin, map within scope → sets `deleted_at`.
+ *   - `adminRestoreMap`         manager or admin, map within scope → clears `deleted_at`.
+ *   - `adminPurgeMap`           admin only,       map within scope → hard-deletes
+ *                               (skips the 30-day `map-purge` cron grace).
+ *   - `adminUpdateMapSettings`  manager or admin, map within scope → updates behavior
+ *                               toggles and auto-tagging config (map.update event).
  *
  * Scope rules (see `mapScopeFilterFor`): admin → any map; manager → maps where
  * `owner_corporation_id = actor.corporation_id` OR `owner_alliance_id = actor.alliance_id`
@@ -131,6 +133,114 @@ export async function adminRestoreMap(
       return { id: row.id.toString() };
     },
   });
+
+  if (result.ok) {
+    revalidatePath('/admin/maps');
+    revalidatePath('/maps');
+  }
+  return result;
+}
+
+const adminMapSettingsSchema = z.object({
+  mapId: z.string().regex(/^\d+$/, 'Invalid map id.'),
+  deleteExpiredConnections: z.boolean().optional(),
+  deleteEolConnections: z.boolean().optional(),
+  trackAbyssalJumps: z.boolean().optional(),
+  logActivity: z.boolean().optional(),
+  tagScheme: z.enum(tagScheme.enumValues).optional(),
+  homeMapSystemId: z.string().regex(/^\d+$/).nullable().optional(),
+  exemptHomeStaticFromTag: z.boolean().optional(),
+});
+
+export type AdminUpdateMapSettingsInput = z.input<typeof adminMapSettingsSchema>;
+
+/**
+ * Update a map's behavior toggles and/or auto-tagging config from the admin
+ * panel. Gated by `isManagerOrAdmin` + map within scope; bypasses the
+ * corp-right matrix. Emits `map.update` (same event kind as the user-facing
+ * `updateMapSettingsAction`). Reconciles the ABC home-static exemption after
+ * any tagging-config change.
+ */
+export async function adminUpdateMapSettings(
+  input: AdminUpdateMapSettingsInput,
+): Promise<ActionResult<MapEventPayload>> {
+  const parsed = adminMapSettingsSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid input.' };
+  }
+  const { mapId: rawId, ...patch } = parsed.data;
+  const id = BigInt(rawId);
+
+  const session = await auth();
+  if (!(await isManagerOrAdmin(session))) {
+    return { ok: false, error: 'Forbidden.' };
+  }
+  const scope = await adminVisibilityScope(session);
+  if (scope === null) return { ok: false, error: 'Forbidden.' };
+
+  const target = await selectScopedMap(id, scope);
+  if (target === null) return { ok: false, error: 'Map not found.' };
+  if (target.deletedAt !== null) return { ok: false, error: 'Map is soft-deleted.' };
+
+  const characterId = session?.characterId ? BigInt(session.characterId) : null;
+  const touchesTagging =
+    'tagScheme' in patch || 'homeMapSystemId' in patch || 'exemptHomeStaticFromTag' in patch;
+
+  const result = await commitMapEvent({
+    mapId: id,
+    characterId,
+    kind: 'map.update',
+    mutate: async (tx) => {
+      const set: Partial<InferInsertModel<typeof apMap>> = { updatedAt: new Date() };
+      const out: MapEventPatch<'map.update'> = { id: id.toString() };
+
+      if ('deleteExpiredConnections' in patch)
+        set.deleteExpiredConnections = out.deleteExpiredConnections = patch.deleteExpiredConnections;
+      if ('deleteEolConnections' in patch)
+        set.deleteEolConnections = out.deleteEolConnections = patch.deleteEolConnections;
+      if ('trackAbyssalJumps' in patch)
+        set.trackAbyssalJumps = out.trackAbyssalJumps = patch.trackAbyssalJumps;
+      if ('logActivity' in patch) set.logActivity = out.logActivity = patch.logActivity;
+      if ('tagScheme' in patch) set.tagScheme = patch.tagScheme;
+      if ('exemptHomeStaticFromTag' in patch)
+        set.exemptHomeStaticFromTag = patch.exemptHomeStaticFromTag;
+      if ('homeMapSystemId' in patch) {
+        if (patch.homeMapSystemId != null) {
+          const homeId = BigInt(patch.homeMapSystemId);
+          const [home] = await tx
+            .select({ id: apMapSystem.id })
+            .from(apMapSystem)
+            .where(
+              and(
+                eq(apMapSystem.id, homeId),
+                eq(apMapSystem.mapId, id),
+                eq(apMapSystem.visible, true),
+              ),
+            );
+          if (!home) throw new Error('Home system is not on this map.');
+          set.homeMapSystemId = homeId;
+        } else {
+          set.homeMapSystemId = null;
+        }
+      }
+
+      const [row] = await tx
+        .update(apMap)
+        .set(set)
+        .where(and(eq(apMap.id, id), isNull(apMap.deletedAt)))
+        .returning({ id: apMap.id });
+      if (!row) throw new Error('Map not found or deleted.');
+      return out;
+    },
+  });
+
+  if (result.ok && touchesTagging) {
+    try {
+      await applyHomeStaticExemption(id, characterId);
+    } catch (err) {
+      console.warn('home-static exemption reconcile failed (map=%s):', id.toString(), err);
+    }
+  }
 
   if (result.ok) {
     revalidatePath('/admin/maps');

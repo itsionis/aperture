@@ -15,25 +15,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { updateMapSettingsAction } from '@/app/(app)/actions/map';
 import { exportMapOnServer, importMapOnServer } from '@/lib/map/client';
-import type { MapEventPayload, MapSettings, MapSystemNode } from '@/types';
-
-/** Minimal system shape the Home picker needs. */
-type HomeOption = Pick<MapSystemNode, 'id' | 'name' | 'alias'>;
-
-const TAG_SCHEME_OPTIONS: { value: MapSettings['tagScheme']; label: string }[] = [
-  { value: 'none', label: 'Off' },
-  { value: 'abc', label: 'ABC — per-class letters' },
-  { value: '0121', label: '0121 — chain numbering' },
-];
+import type { MapEventPayload, MapSettings } from '@/types';
 
 /**
  * Map Settings dialog — the consolidated edit / settings /
- * import-export surface, launched from the `MapCanvas` toolbar. General +
- * Settings persist via `updateMapSettingsAction` (`map_update`); Export reads
+ * import-export surface, launched from the `MapCanvas` toolbar. General
+ * persists via `updateMapSettingsAction` (`map_update`); Export reads
  * `/export` (`map_export`) and downloads the JSON client-side; Import posts to
  * `/import` (`map_import`) and folds the returned payloads onto the canvas via
- * `onImported`. Webhooks are intentionally NOT here — they stay in the admin
- * panel.
+ * `onImported`. Behavior toggles and auto-tagging are admin-only and live at
+ * `/admin/maps/<id>/settings`. Webhooks are intentionally NOT here — they stay
+ * in the admin panel.
  */
 export function MapSettingsDialog({
   open,
@@ -41,8 +33,6 @@ export function MapSettingsDialog({
   mapId,
   settings,
   onImported,
-  canConfigureTagging,
-  systems,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -50,10 +40,6 @@ export function MapSettingsDialog({
   settings: MapSettings;
   /** Fold imported event payloads onto the live canvas (reuses the bulk-paste handler). */
   onImported: (payloads: MapEventPayload[]) => void;
-  /** Owner/admin gate: shows the Tagging tab. */
-  canConfigureTagging: boolean;
-  /** Visible systems, for the Home-system picker. */
-  systems: HomeOption[];
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -69,7 +55,6 @@ export function MapSettingsDialog({
           <TabsList>
             <TabsTab value="general">General</TabsTab>
             <TabsTab value="settings">Settings</TabsTab>
-            {canConfigureTagging && <TabsTab value="tagging">Tagging</TabsTab>}
             <TabsTab value="export">Export</TabsTab>
             <TabsTab value="import">Import</TabsTab>
           </TabsList>
@@ -78,13 +63,8 @@ export function MapSettingsDialog({
             <GeneralPanel mapId={mapId} settings={settings} />
           </TabsPanel>
           <TabsPanel value="settings">
-            <SettingsPanel mapId={mapId} settings={settings} />
+            <SettingsPlaceholder />
           </TabsPanel>
-          {canConfigureTagging && (
-            <TabsPanel value="tagging">
-              <TaggingPanel mapId={mapId} settings={settings} systems={systems} />
-            </TabsPanel>
-          )}
           <TabsPanel value="export">
             <ExportPanel mapId={mapId} mapName={settings.name} />
           </TabsPanel>
@@ -97,112 +77,11 @@ export function MapSettingsDialog({
   );
 }
 
-function TaggingPanel({
-  mapId,
-  settings,
-  systems,
-}: {
-  mapId: string;
-  settings: MapSettings;
-  systems: HomeOption[];
-}) {
-  const [scheme, setScheme] = useState<MapSettings['tagScheme']>(settings.tagScheme);
-  const [homeMapSystemId, setHomeMapSystemId] = useState(settings.homeMapSystemId ?? '');
-  const [exemptHomeStatic, setExemptHomeStatic] = useState(settings.exemptHomeStaticFromTag);
-  const [pending, startTransition] = useTransition();
-
-  // The exemption only applies under ABC and needs a Home to anchor the static.
-  const canExempt = scheme === 'abc' && homeMapSystemId !== '';
-
-  function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    startTransition(async () => {
-      const result = await updateMapSettingsAction({
-        mapId,
-        tagScheme: scheme,
-        homeMapSystemId: homeMapSystemId === '' ? null : homeMapSystemId,
-        exemptHomeStaticFromTag: exemptHomeStatic,
-      });
-      if (result.ok) toast.success('Tagging updated.');
-      else toast.error(result.error);
-    });
-  }
-
-  const selectClass =
-    'h-9 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
-
+function SettingsPlaceholder() {
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="map-tag-scheme" className="text-sm font-medium">
-          Auto-tagging scheme
-        </label>
-        <select
-          id="map-tag-scheme"
-          value={scheme}
-          onChange={(e) => setScheme(e.target.value as MapSettings['tagScheme'])}
-          className={selectClass}
-        >
-          {TAG_SCHEME_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        <p className="text-xs text-muted-foreground">
-          Newly discovered systems are tagged automatically. ABC assigns per-class letters; 0121
-          numbers each system by its position in the chain off Home.
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="map-home-system" className="text-sm font-medium">
-          Home system
-        </label>
-        <select
-          id="map-home-system"
-          value={homeMapSystemId}
-          onChange={(e) => setHomeMapSystemId(e.target.value)}
-          disabled={scheme === 'none'}
-          className={`${selectClass} disabled:opacity-50`}
-        >
-          <option value="">— None —</option>
-          {systems.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.alias ? `${s.alias} (${s.name})` : s.name}
-            </option>
-          ))}
-        </select>
-        <p className="text-xs text-muted-foreground">
-          The central node both schemes calculate from. It cannot be removed from the map while
-          designated.
-        </p>
-      </div>
-
-      <label className="flex items-start gap-3">
-        <input
-          type="checkbox"
-          className="mt-0.5 size-4 accent-primary disabled:opacity-50"
-          checked={exemptHomeStatic}
-          disabled={!canExempt}
-          onChange={(e) => setExemptHomeStatic(e.target.checked)}
-        />
-        <span className="flex flex-col">
-          <span className="text-sm font-medium">Exempt home static from auto-tag</span>
-          <span className="text-xs text-muted-foreground">
-            ABC only. Leave the system on the far side of Home’s static connection untagged — its
-            letter is freed for reclaim. Mark the connection as Static via its right-click menu.
-          </span>
-        </span>
-      </label>
-
-      <div className="flex justify-end">
-        <Button type="submit" disabled={pending}>
-          <Save />
-          {pending ? 'Saving…' : 'Save'}
-        </Button>
-      </div>
-    </form>
+    <p className="py-2 text-sm text-muted-foreground">
+      User display preferences will appear here.
+    </p>
   );
 }
 
@@ -272,75 +151,6 @@ function GeneralPanel({ mapId, settings }: { mapId: string; settings: MapSetting
   );
 }
 
-type ToggleKey =
-  | 'deleteExpiredConnections'
-  | 'deleteEolConnections'
-  | 'trackAbyssalJumps'
-  | 'logActivity';
-
-const TOGGLES: { key: ToggleKey; label: string; description: string }[] = [
-  {
-    key: 'deleteExpiredConnections',
-    label: 'Delete expired connections',
-    description: 'Auto-remove connections past their lifetime.',
-  },
-  {
-    key: 'deleteEolConnections',
-    label: 'Delete EOL connections',
-    description: 'Auto-remove connections once they pass end-of-life.',
-  },
-  {
-    key: 'trackAbyssalJumps',
-    label: 'Track abyssal jumps',
-    description: 'Record abyssal traversals as connections.',
-  },
-  { key: 'logActivity', label: 'Log activity', description: 'Record map activity to history.' },
-];
-
-function SettingsPanel({ mapId, settings }: { mapId: string; settings: MapSettings }) {
-  const [values, setValues] = useState<Record<ToggleKey, boolean>>({
-    deleteExpiredConnections: settings.deleteExpiredConnections,
-    deleteEolConnections: settings.deleteEolConnections,
-    trackAbyssalJumps: settings.trackAbyssalJumps,
-    logActivity: settings.logActivity,
-  });
-  const [pending, startTransition] = useTransition();
-
-  function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    startTransition(async () => {
-      const result = await updateMapSettingsAction({ mapId, ...values });
-      if (result.ok) toast.success('Settings saved.');
-      else toast.error(result.error);
-    });
-  }
-
-  return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-3">
-      {TOGGLES.map((t) => (
-        <label key={t.key} className="flex items-start gap-3">
-          <input
-            type="checkbox"
-            className="mt-0.5 size-4 accent-primary"
-            checked={values[t.key]}
-            onChange={(e) => setValues((v) => ({ ...v, [t.key]: e.target.checked }))}
-          />
-          <span className="flex flex-col">
-            <span className="text-sm font-medium">{t.label}</span>
-            <span className="text-xs text-muted-foreground">{t.description}</span>
-          </span>
-        </label>
-      ))}
-
-      <div className="flex justify-end">
-        <Button type="submit" disabled={pending}>
-          <Save />
-          {pending ? 'Saving…' : 'Save'}
-        </Button>
-      </div>
-    </form>
-  );
-}
 
 function ExportPanel({ mapId, mapName }: { mapId: string; mapName: string }) {
   const [pending, startTransition] = useTransition();
