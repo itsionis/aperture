@@ -294,6 +294,7 @@ export function MapCanvas({
     securityClasses: [],
   });
   const [flashSigId, setFlashSigId] = useState<string | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // One-shot "Lazy delete" arm for the CTRL+V fast paste: when on, the next
   // direct scanner paste also removes missing sigs, then disarms itself.
   const [lazyDeleteSigs, setLazyDeleteSigs] = useState(false);
@@ -362,6 +363,7 @@ export function MapCanvas({
 
   // Flush nothing but cancel a pending debounce on unmount.
   useEffect(() => () => clearTimeout(saveTimer.current ?? undefined), []);
+  useEffect(() => () => clearTimeout(flashTimer.current ?? undefined), []);
 
   const handleLayoutChange = useCallback(
     (_current: Layout, all: ResponsiveLayouts<Breakpoint>) => {
@@ -412,14 +414,15 @@ export function MapCanvas({
     saveLayout(next);
   }, [saveLayout]);
 
-  function handleNavigateToSig(systemId: string, sigId: string) {
+  const handleNavigateToSig = useCallback((systemId: string, sigId: string) => {
     setSigSearchOpen(false);
     setSelected({ kind: 'system', id: systemId });
     setSelectedSystemIds(new Set([systemId]));
     flowInstance.current?.fitView({ nodes: [{ id: systemId }], padding: 0.5, duration: 400 });
+    if (flashTimer.current) clearTimeout(flashTimer.current);
     setFlashSigId(sigId);
-    setTimeout(() => setFlashSigId(null), 3000);
-  }
+    flashTimer.current = setTimeout(() => setFlashSigId(null), 3000);
+  }, []);
 
   useMapSubscription(Number(data.map.id));
 
