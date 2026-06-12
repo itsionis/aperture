@@ -299,11 +299,11 @@ function renderItems({
 }
 
 /**
- * "Set destination" — appends this system as an autopilot waypoint on the map's
- * active character. Reads the active character from `MapActiveCharContext`
- * directly (it isn't available to `MapCanvas`, which sits above the provider),
- * so the action and the network call live here rather than flowing through a
- * parent callback. Disabled when no character is active.
+ * "Set destination" — appends this system as an autopilot waypoint.
+ *
+ * - 0 located chars: disabled item (no active character)
+ * - 1 located char: direct action — no submenu chrome
+ * - 2+ located chars: submenu with per-character entries + "All characters" fan-out
  */
 function SetDestinationItem({
   system,
@@ -312,24 +312,86 @@ function SetDestinationItem({
   system: MapSystemNode;
   onClose: () => void;
 }) {
-  const { activeCharId } = useMapActiveChar();
+  const { activeCharId, locatedChars } = useMapActiveChar();
+
+  if (locatedChars.length === 0) {
+    return (
+      <MenuItem icon={<Navigation className="size-3.5" />} disabled>
+        Set destination
+      </MenuItem>
+    );
+  }
+
+  if (locatedChars.length === 1) {
+    const char = locatedChars[0]!;
+    return (
+      <MenuItem
+        icon={<Navigation className="size-3.5" />}
+        onClick={() => {
+          void setWaypointOnServer({
+            characterId: char.id,
+            destinationId: system.systemId,
+          }).then((result) => {
+            if (result.ok) toast.success(`Waypoint set to ${systemLabel(system)}`);
+          });
+          onClose();
+        }}
+      >
+        Set destination
+      </MenuItem>
+    );
+  }
+
   return (
-    <MenuItem
-      icon={<Navigation className="size-3.5" />}
-      disabled={activeCharId === null}
-      onClick={() => {
-        if (activeCharId === null) return;
-        void setWaypointOnServer({
-          characterId: activeCharId,
-          destinationId: system.systemId,
-        }).then((result) => {
-          if (result.ok) toast.success(`Waypoint set to ${systemLabel(system)}`);
-        });
-        onClose();
-      }}
-    >
-      Set destination
-    </MenuItem>
+    <MenuSubmenu>
+      <MenuSubmenuTrigger icon={<Navigation className="size-3.5" />}>
+        Set destination
+      </MenuSubmenuTrigger>
+      <MenuSubmenuContent>
+        <MenuItem
+          onClick={() => {
+            const total = locatedChars.length;
+            void Promise.allSettled(
+              locatedChars.map((c) =>
+                setWaypointOnServer({ characterId: c.id, destinationId: system.systemId }),
+              ),
+            ).then((results) => {
+              const successes = results.filter(
+                (r) => r.status === 'fulfilled' && r.value.ok,
+              ).length;
+              if (successes === 0) {
+                toast.error('Failed to set destination for any character');
+              } else if (successes === total) {
+                toast.success(`Destination set for all ${total} characters`);
+              } else {
+                toast.success(`Destination set for ${successes} of ${total} characters`);
+              }
+            });
+            onClose();
+          }}
+        >
+          All characters
+        </MenuItem>
+        <MenuSeparator />
+        {locatedChars.map((char) => (
+          <MenuItem
+            key={char.id}
+            className={char.id === activeCharId ? 'font-bold' : undefined}
+            onClick={() => {
+              void setWaypointOnServer({
+                characterId: char.id,
+                destinationId: system.systemId,
+              }).then((result) => {
+                if (result.ok) toast.success(`Waypoint set to ${systemLabel(system)}`);
+              });
+              onClose();
+            }}
+          >
+            {char.name}
+          </MenuItem>
+        ))}
+      </MenuSubmenuContent>
+    </MenuSubmenu>
   );
 }
 
