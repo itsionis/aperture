@@ -19,7 +19,7 @@ Three branches depending on the number of located characters from `useMapActiveC
 ### Behaviour & Interactions
 - `onClose` is called synchronously on click before the async API call resolves
 - When a single character sets a waypoint and `ok: true`, shows `Waypoint set to <alias|name>`
-- When `ok: false`, no toast is shown
+- When `ok: false`, `SetDestinationItem` fires no toast itself — the error toast is fired automatically by `requestJson` (the HTTP utility layer), so the failure is not silent end-to-end
 - Active character's entry is bold via `cn(char.id === activeCharId && 'font-bold')`
 
 ### Emits / Calls

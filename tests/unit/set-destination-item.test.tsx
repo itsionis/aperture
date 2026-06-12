@@ -264,3 +264,103 @@ describe('SetDestinationItem — 1-char interaction', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 });
+
+// ---------------------------------------------------------------------------
+// 2-char interaction: fan-out, toasts, onClose, individual char entries
+// ---------------------------------------------------------------------------
+
+describe('SetDestinationItem — multi-char interaction', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+  const TWO_CHARS = [{ id: 1, name: 'Alpha' }, { id: 2, name: 'Beta' }];
+
+  /** Returns all [data-slot="menu-item"] elements inside the submenu content. */
+  function submenuItems(): HTMLElement[] {
+    const content = container.querySelector('[data-slot="menu-submenu-content"]')!;
+    return Array.from(content.querySelectorAll('[data-slot="menu-item"]')) as HTMLElement[];
+  }
+
+  beforeEach(() => {
+    (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
+      true;
+    vi.clearAllMocks();
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('A: "All characters" fan-out calls setWaypointOnServer for each located char', async () => {
+    mockUseMapActiveChar.mockReturnValue(makeCtx(TWO_CHARS, 1));
+    mockSetWaypoint.mockResolvedValue({ ok: true });
+    act(() => {
+      root.render(<SetDestinationItem system={SYSTEM} onClose={vi.fn()} />);
+    });
+    act(() => {
+      submenuItems()[0]!.click(); // "All characters" is first item
+    });
+    await act(async () => {});
+    expect(mockSetWaypoint).toHaveBeenCalledTimes(2);
+    expect(mockSetWaypoint).toHaveBeenCalledWith({ characterId: 1, destinationId: 30000142 });
+    expect(mockSetWaypoint).toHaveBeenCalledWith({ characterId: 2, destinationId: 30000142 });
+  });
+
+  it('B: "All characters" calls applyWaypointFanOutResult with correct counts (1 of 2)', async () => {
+    mockUseMapActiveChar.mockReturnValue(makeCtx(TWO_CHARS, 1));
+    mockSetWaypoint
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: false, error: 'ESI error' });
+    act(() => {
+      root.render(<SetDestinationItem system={SYSTEM} onClose={vi.fn()} />);
+    });
+    act(() => {
+      submenuItems()[0]!.click();
+    });
+    await act(async () => {});
+    expect(toast.success).toHaveBeenCalledWith('Destination set for 1 of 2 characters');
+  });
+
+  it('C: "All characters" calls onClose synchronously', () => {
+    mockUseMapActiveChar.mockReturnValue(makeCtx(TWO_CHARS, 1));
+    mockSetWaypoint.mockResolvedValue({ ok: true });
+    const onClose = vi.fn();
+    act(() => {
+      root.render(<SetDestinationItem system={SYSTEM} onClose={onClose} />);
+    });
+    act(() => {
+      submenuItems()[0]!.click();
+    });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('D: individual char entry calls setWaypointOnServer with that char\'s id', async () => {
+    mockUseMapActiveChar.mockReturnValue(makeCtx(TWO_CHARS, 1));
+    mockSetWaypoint.mockResolvedValue({ ok: true });
+    act(() => {
+      root.render(<SetDestinationItem system={SYSTEM} onClose={vi.fn()} />);
+    });
+    // submenuItems: [0] = "All characters", [1] = Alpha, [2] = Beta
+    act(() => {
+      submenuItems()[2]!.click(); // "Beta" — id: 2
+    });
+    await act(async () => {});
+    expect(mockSetWaypoint).toHaveBeenCalledWith({ characterId: 2, destinationId: 30000142 });
+  });
+
+  it('E: individual char entry calls onClose synchronously', () => {
+    mockUseMapActiveChar.mockReturnValue(makeCtx(TWO_CHARS, 1));
+    mockSetWaypoint.mockResolvedValue({ ok: true });
+    const onClose = vi.fn();
+    act(() => {
+      root.render(<SetDestinationItem system={SYSTEM} onClose={onClose} />);
+    });
+    act(() => {
+      submenuItems()[1]!.click(); // "Alpha" — first char entry
+    });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+});
