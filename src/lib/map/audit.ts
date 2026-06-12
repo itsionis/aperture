@@ -6,7 +6,6 @@ import { db } from '@/db/client';
 import {
   apCharacter,
   apMap,
-  apMapConnection,
   apMapEvent,
   apMapSystem,
   apUser,
@@ -42,7 +41,7 @@ export interface AuditEventRow {
   /** Acting character id; `null` for job-driven / automation events. */
   characterId: string | null;
   characterName: string | null;
-  /** Human one-liner ("Koro set Jita status → friendly"). Never null in a row. */
+  /** Sentence-cased action with no actor ("Set Jita status to `friendly`."). Never null. */
   summary: string;
   /** A destroy-shaped action (system/connection/signature removal, map delete/purge). */
   destructive: boolean;
@@ -255,11 +254,10 @@ export async function queryAuditEvents(params: AuditQueryParams): Promise<AuditP
 
   const rows: AuditEventRow[] = page.map((r) => {
     const kind = r.kind as MapEventKind;
-    const who = r.characterName ?? 'Aperture';
     const parsed = mapEventPayloadSchema.safeParse(r.payload);
-    let summary: string | null = null;
+    let action: string | null = null;
     if (parsed.success) {
-      summary = describeMapEvent(parsed.data, buildContext(parsed.data, r.characterName, names), who);
+      action = describeMapEvent(parsed.data, buildContext(parsed.data, r.characterName, names));
     }
     return {
       id: r.id.toString(),
@@ -268,7 +266,9 @@ export async function queryAuditEvents(params: AuditQueryParams): Promise<AuditP
       category: kindCategory(kind),
       characterId: r.characterId?.toString() ?? null,
       characterName: r.characterName,
-      summary: summary ?? fallbackSummary(kind, who),
+      // The actor lives in its own column — the summary is the action alone, with
+      // the first letter capitalized so it reads as a standalone log line.
+      summary: capitalize(action ?? fallbackSummary(kind)),
       destructive: DESTRUCTIVE_KINDS.has(kind),
     };
   });
@@ -282,13 +282,18 @@ export async function queryAuditEvents(params: AuditQueryParams): Promise<AuditP
 
 interface ResolvedNames {
   systemNameByMapSystemId: Map<string, string>;
-  endpointsByConnectionId: Map<string, { source: string | null; target: string | null }>;
 }
 
-/** Batch-resolve every system / connection-endpoint name referenced by a page of payloads. */
+/**
+ * Batch-resolve every referenced system name for a page of payloads in one query.
+ * Every system reference rides the payload as an `ap_map_system` id — including
+ * the audit descriptors (connection endpoints, a signature's owning system)
+ * embedded at mutation time — so even hard-deleted connections / signatures
+ * resolve against the persistent `ap_map_system` rows (those rows soft-delete and
+ * outlive every event that names them).
+ */
 async function resolveNames(payloads: unknown[]): Promise<ResolvedNames> {
   const mapSystemIds = new Set<bigint>();
-  const connectionIds = new Set<bigint>();
 
   for (const raw of payloads) {
     const parsed = mapEventPayloadSchema.safeParse(raw);
@@ -301,40 +306,21 @@ async function resolveNames(payloads: unknown[]): Promise<ResolvedNames> {
         addId(mapSystemIds, ev.id);
         break;
       case 'signature.create':
+      case 'signature.update':
+        addId(mapSystemIds, ev.mapSystemId);
+        addId(mapSystemIds, ev.leadsToMapSystemId);
+        break;
+      case 'signature.delete':
         addId(mapSystemIds, ev.mapSystemId);
         break;
       case 'connection.create':
+      case 'connection.update':
+      case 'connection.delete':
         addId(mapSystemIds, ev.source);
         addId(mapSystemIds, ev.target);
         break;
-      case 'connection.update':
-        addId(connectionIds, ev.id);
-        break;
       default:
         break;
-    }
-  }
-
-  const endpointsByConnectionId = new Map<
-    string,
-    { source: string | null; target: string | null }
-  >();
-  if (connectionIds.size > 0) {
-    const rows = await db
-      .select({
-        id: apMapConnection.id,
-        source: apMapConnection.sourceMapSystemId,
-        target: apMapConnection.targetMapSystemId,
-      })
-      .from(apMapConnection)
-      .where(inArray(apMapConnection.id, [...connectionIds]));
-    for (const row of rows) {
-      mapSystemIds.add(row.source);
-      mapSystemIds.add(row.target);
-      endpointsByConnectionId.set(row.id.toString(), {
-        source: row.source.toString(),
-        target: row.target.toString(),
-      });
     }
   }
 
@@ -350,7 +336,7 @@ async function resolveNames(payloads: unknown[]): Promise<ResolvedNames> {
     }
   }
 
-  return { systemNameByMapSystemId, endpointsByConnectionId };
+  return { systemNameByMapSystemId };
 }
 
 function addId(set: Set<bigint>, value: string | null | undefined): void {
@@ -380,18 +366,20 @@ function buildContext(
       systemName = nameOf(ev.id);
       break;
     case 'signature.create':
+    case 'signature.update':
+      systemName = nameOf(ev.mapSystemId);
+      // `targetSystemName` doubles as the sig's leads-to endpoint for the formatter.
+      targetSystemName = nameOf(ev.leadsToMapSystemId);
+      break;
+    case 'signature.delete':
       systemName = nameOf(ev.mapSystemId);
       break;
     case 'connection.create':
+    case 'connection.update':
+    case 'connection.delete':
       sourceSystemName = nameOf(ev.source);
       targetSystemName = nameOf(ev.target);
       break;
-    case 'connection.update': {
-      const endpoints = names.endpointsByConnectionId.get(ev.id);
-      sourceSystemName = nameOf(endpoints?.source);
-      targetSystemName = nameOf(endpoints?.target);
-      break;
-    }
     default:
       break;
   }
@@ -400,16 +388,22 @@ function buildContext(
   return { mapName: '', characterName, systemName, sourceSystemName, targetSystemName };
 }
 
-/** Phrasing for events `describeMapEvent` declines (admin map.restore / map.purge). */
-function fallbackSummary(kind: MapEventKind, who: string): string {
+/** Action phrasing (no actor) for events `describeMapEvent` declines (admin map.restore / map.purge). */
+function fallbackSummary(kind: MapEventKind): string {
   switch (kind) {
     case 'map.restore':
-      return `${who} restored the map.`;
+      return 'restored the map';
     case 'map.purge':
-      return `${who} permanently purged the map.`;
+      return 'permanently purged the map';
     default:
-      return `${who} made a change (${kind}).`;
+      return `made a change (${kind})`;
   }
+}
+
+/** Sentence-case the action phrase and end it with a period (the table's actor column carries the name). */
+function capitalize(action: string): string {
+  const trimmed = action.endsWith('.') ? action : `${action}.`;
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 }
 
 /**

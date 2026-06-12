@@ -5,8 +5,10 @@
 
 ---
 
-### describeMapEvent(event, ctx, who): string | null
-The single human-readable, one-line description of a map event (`"<who> set **Jita** status to \`friendly\`."`). Shared by `formatHistoryMessage` (Discord) and the manager audit console (`src/lib/map/audit.ts`) so both surfaces phrase a commit identically. Returns `null` when the event has nothing worth saying — notably a position-only `system.updated` (a canvas drag), which both callers drop. Does not handle `map.restore` / `map.purge` (returns `null`); the audit layer supplies its own fallback for those.
+### describeMapEvent(event, ctx): string | null
+The single human-readable description of a map event — **the action only, with no leading actor** (`"set **Jita** status to \`friendly\`"`, no trailing period). Shared by `formatHistoryMessage` (Discord, which prepends the acting character + a period) and the manager audit console (`src/lib/map/audit.ts`, which has its own actor column and sentence-cases the phrase) so both surfaces phrase a commit identically without duplicating the name. Returns `null` when the event has nothing worth saying — a position-only `system.updated` (a canvas drag) **or** an `*.update` whose only fields are unrecognized/descriptor-only — which both callers drop. Does not handle `map.restore` / `map.purge` (returns `null`); the audit layer supplies its own fallback.
+
+`*.update` lines **enumerate every changed field** as a `field → value` clause list in parentheses, so the trail shows exactly what changed rather than "made a change": `connection.update` → `"updated **A** ↔ **B** (max ship size → large, mass → \`critical\`)"` (covers `scope`/`massStatus`/`jumpMassClass`/`eolStage`/`isRolling`/`preserveMass`/`isStatic`; `jumpMassClass` maps `s`/`m`/`l`/`xl` → small/medium/large/x-large via `JUMP_MASS_LABEL`); `signature.update` → `"updated signature \`AUQ\` in **Jita** (type → \`B274\`)"`. `describeSignatureChanges` **suppresses the housekeeping field-resets** the client folds into a primary edit — picking a WH type clears `name` (the code-mirror), and changing the group clears `typeId`+`name` — so the line reports intent, not noise. A `mapConnectionId` change reads `"leads to **<dest>**"` / `"unlinked from **<dest>**"`, where `<dest>` is `ctx.targetSystemName` (resolved from the payload's `leadsToMapSystemId`). `sigId`/`mapSystemId` are descriptor-only and never counted as changes. `describeSignatureCreate` summarizes a new sig as `"(wormhole \`C008\`, leads to **<dest>**)"` (WH) or `"(relic site)"` (cosmic) via `signatureClassification`. Destructive lines name their target from descriptors embedded in the payload: `connection.delete` reads `ctx.sourceSystemName`/`targetSystemName`, `signature.delete` reads `event.sigId` + `ctx.systemName`. Pre-fix historical events lacking the descriptors fall back to generic placeholders.
 
 **Parameters:**
 - `event` — the validated `MapEventPayload`.
@@ -21,7 +23,7 @@ Returns true when `event.kind === 'system.updated'` AND `event.rallyAt` is a non
 ---
 
 ### formatHistoryMessage(event, ctx, mapName?): DiscordWebhookPayload | null
-Build a Discord payload (single-line `content`) describing the event for a `history` webhook. Returns `null` for events that are nothing but cosmetic position updates (skip silently).
+Build a Discord payload (single-line `content`) describing the event for a `history` webhook. Composes `**<map>** — <who> <action>.` from `describeMapEvent` (which omits the actor) — `<who>` is `ctx.characterName ?? 'Aperture'`. Returns `null` for events that are nothing but cosmetic position updates / no-op updates (skip silently).
 
 **Parameters:**
 - `event` — the `ap_map_event.payload` validated against `mapEventPayloadSchema`.
@@ -41,4 +43,4 @@ The embed is red (`0xE74C3C`), titled `"Rally point set in <system>"`, and times
 
 ### Types
 
-- `WebhookEventContext` — `{ mapName, characterName, systemName, sourceSystemName, targetSystemName }`. Every name field is `string | null`; the dispatcher fills what it can resolve and the formatter falls back to generic placeholders ("a system", "Aperture", …) for missing pieces.
+- `WebhookEventContext` — `{ mapName, characterName, systemName, sourceSystemName, targetSystemName }`. Every name field is `string | null`; the dispatcher fills what it can resolve and the formatter falls back to generic placeholders ("a system", "Aperture", …) for missing pieces. For connection events `source`/`targetSystemName` are the two endpoints; for signature events `systemName` is the sig's own system and `targetSystemName` doubles as the sig's leads-to destination (resolved from `leadsToMapSystemId`).
