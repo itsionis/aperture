@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { updateMapSettingsAction } from '@/app/(app)/actions/map';
 import { exportMapOnServer, importMapOnServer } from '@/lib/map/client';
+import { readLowContrast, writeLowContrast } from '@/lib/lowContrast';
 import type { MapEventPayload, MapSettings } from '@/types';
 
 /**
@@ -63,7 +64,7 @@ export function MapSettingsDialog({
             <GeneralPanel mapId={mapId} settings={settings} />
           </TabsPanel>
           <TabsPanel value="settings">
-            <SettingsPlaceholder />
+            <SettingsPanel />
           </TabsPanel>
           <TabsPanel value="export">
             <ExportPanel mapId={mapId} mapName={settings.name} />
@@ -77,11 +78,39 @@ export function MapSettingsDialog({
   );
 }
 
-function SettingsPlaceholder() {
+function SettingsPanel() {
+  // Client-only display prefs, persisted to localStorage. The lazy initializer
+  // reads localStorage on first render; safe because this panel only mounts once
+  // the dialog opens (never during SSR), so there's no hydration mismatch.
+  const [lowContrast, setLowContrast] = useState(readLowContrast);
+
+  function onToggleLowContrast(next: boolean) {
+    setLowContrast(next);
+    writeLowContrast(next);
+  }
+
   return (
-    <p className="py-2 text-sm text-muted-foreground">
-      User display preferences will appear here.
-    </p>
+    <div className="flex flex-col gap-4">
+      <p className="text-sm text-muted-foreground">
+        These preferences are stored on this device only.
+      </p>
+
+      <label className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-muted">
+        <div className="flex flex-1 flex-col gap-0.5">
+          <span className="font-medium text-foreground">Low-contrast theme</span>
+          <span className="text-xs text-muted-foreground">
+            Softens the interface contrast. Off by default.
+          </span>
+        </div>
+        <input
+          type="checkbox"
+          className="size-4 accent-primary"
+          checked={lowContrast}
+          onChange={(e) => onToggleLowContrast(e.target.checked)}
+          aria-label="Low-contrast theme"
+        />
+      </label>
+    </div>
   );
 }
 

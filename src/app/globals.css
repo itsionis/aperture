@@ -122,6 +122,35 @@
     --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Low-contrast mode. Opt-in (off by default), toggled in the map Settings tab
+   and persisted to localStorage; the `low-contrast` class rides alongside the
+   always-on `.dark` class on <html>. Aperture's default theme deliberately runs
+   higher contrast than Pathfinder (WCAG-validated); these overrides soften it
+   for users who find it straining — backgrounds lift, foregrounds drop toward
+   mid-grey. See src/lib/lowContrast.ts. */
+.dark.low-contrast {
+  /* Lift the near-black surfaces and pull the near-white text/foregrounds down
+     toward mid-grey — the two ends are what drive the contrast. */
+  --background: oklch(0.225 0 0);
+  --foreground: oklch(0.8 0 0);
+  --card: oklch(0.275 0 0);
+  --card-foreground: oklch(0.8 0 0);
+  --map-node: oklch(0.345 0 0);
+  --popover: oklch(0.275 0 0);
+  --popover-foreground: oklch(0.8 0 0);
+  --primary: oklch(0.8 0 0);
+  --secondary-foreground: oklch(0.8 0 0);
+  --muted-foreground: oklch(0.6 0 0);
+  --accent-foreground: oklch(0.8 0 0);
+  --sidebar: oklch(0.275 0 0);
+  --sidebar-foreground: oklch(0.8 0 0);
+  --sidebar-accent-foreground: oklch(0.8 0 0);
+}
+
+.dark.low-contrast .react-flow {
+  --xy-background-color: oklch(0.275 0 0);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
